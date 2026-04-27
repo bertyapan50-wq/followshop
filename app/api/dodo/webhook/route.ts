@@ -36,7 +36,8 @@ function mapStatus(dodoStatus: string): SubscriptionStatus {
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.text()
-    const signature = req.headers.get('webhook-signature') ?? ''
+    const signature = req.headers.get('x-dodo-signature') ?? 
+                  req.headers.get('webhook-signature') ?? ''
 
     if (!verifySignature(payload, signature)) {
       return NextResponse.json(
