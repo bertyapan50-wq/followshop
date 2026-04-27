@@ -25,18 +25,15 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.text()
     const event = JSON.parse(payload)
-    
-    console.log('Webhook received:', JSON.stringify(event, null, 2))
-    
+
     const eventType: string = event.type
     const data = event.data
     const userId: string = data?.metadata?.user_id
     const plan: Plan = data?.metadata?.plan ?? 'free'
 
-    console.log(`Event: ${eventType}, User: ${userId}, Plan: ${plan}`)
+    console.log(`Dodo Webhook: ${eventType} for user ${userId} plan ${plan}`)
 
     if (!userId) {
-      console.error('No user_id in metadata!')
       return NextResponse.json({ error: 'No user_id' }, { status: 400 })
     }
 
@@ -46,8 +43,6 @@ export async function POST(req: NextRequest) {
       eventType === 'subscription.updated' ||
       eventType === 'subscription.resumed'
     ) {
-      console.log('Upserting subscription...')
-      
       const { error } = await supabaseAdmin
         .from('subscriptions')
         .upsert(
@@ -67,17 +62,17 @@ export async function POST(req: NextRequest) {
         )
 
       if (error) {
-        console.error('Supabase error:', JSON.stringify(error))
+        console.error('Supabase error:', error.message)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-      
+
       console.log('Subscription updated successfully!')
     }
 
     return NextResponse.json({ received: true })
 
   } catch (err: any) {
-    console.error('Webhook error:', err?.message ?? err)
+    console.error('Dodo Webhook error:', err?.message ?? err)
     return NextResponse.json(
       { error: err?.message ?? 'Webhook processing failed' },
       { status: 500 }
