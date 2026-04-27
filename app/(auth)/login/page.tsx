@@ -8,8 +8,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Ilagay ang email at password.')
+      return
+    }
     setLoading(true)
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -21,8 +28,28 @@ export default function LoginPage() {
     }
   }
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Ilagay muna ang iyong email address.')
+      return
+    }
+    setResetLoading(true)
+    setError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://followshop.netlify.app/reset-password',
+    })
+    setResetLoading(false)
+    if (error) {
+      setError(error.message)
+    } else {
+      setResetSent(true)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleLogin()
+    if (e.key === 'Enter') {
+      forgotMode ? handleForgotPassword() : handleLogin()
+    }
   }
 
   return (
@@ -176,6 +203,22 @@ export default function LoginPage() {
           gap: 7px;
         }
 
+        .auth-success {
+          background: #F0FDF4;
+          border: 1px solid #BBF7D0;
+          color: #15803D;
+          padding: 14px 16px;
+          border-radius: 10px;
+          font-size: 13px;
+          margin-bottom: 16px;
+          line-height: 1.6;
+        }
+        .auth-success strong {
+          display: block;
+          font-size: 14px;
+          margin-bottom: 3px;
+        }
+
         .auth-btn {
           width: 100%;
           padding: 12px;
@@ -192,6 +235,42 @@ export default function LoginPage() {
         }
         .auth-btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .auth-forgot-row {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: -8px;
+          margin-bottom: 16px;
+        }
+        .auth-forgot-link {
+          background: none;
+          border: none;
+          color: #EE4D2D;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          padding: 0;
+          text-decoration: none;
+          transition: opacity .15s;
+        }
+        .auth-forgot-link:hover { opacity: 0.75; text-decoration: underline; }
+
+        .auth-back-link {
+          background: none;
+          border: none;
+          color: #888;
+          font-size: 13px;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 24px;
+          transition: color .15s;
+        }
+        .auth-back-link:hover { color: #111; }
 
         .auth-footer {
           text-align: center;
@@ -253,54 +332,116 @@ export default function LoginPage() {
 
           {/* ── Right Panel ── */}
           <div className="auth-right">
-            <h1 className="auth-form-heading">Welcome back 👋</h1>
-            <p className="auth-form-sub">Sign in sa iyong FollowShop account</p>
 
-            {error && (
-              <div className="auth-error">
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                {error}
-              </div>
+            {/* ── FORGOT PASSWORD MODE ── */}
+            {forgotMode ? (
+              <>
+                <button className="auth-back-link" onClick={() => { setForgotMode(false); setError(''); setResetSent(false) }}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                  </svg>
+                  Bumalik sa login
+                </button>
+
+                <h1 className="auth-form-heading">Reset Password 🔑</h1>
+                <p className="auth-form-sub">Ilagay ang iyong email — magpapadala kami ng reset link.</p>
+
+                {error && (
+                  <div className="auth-error">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                {resetSent ? (
+                  <div className="auth-success">
+                    <strong>✅ Na-send na ang reset link!</strong>
+                    Tingnan ang iyong email ({email}) at i-click ang link para ma-reset ang password. Check din ang spam folder.
+                  </div>
+                ) : (
+                  <>
+                    <div className="auth-field">
+                      <label className="auth-label">Email</label>
+                      <input
+                        className="auth-input"
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="you@email.com"
+                        autoFocus
+                      />
+                    </div>
+                    <button className="auth-btn" onClick={handleForgotPassword} disabled={resetLoading}>
+                      {resetLoading ? 'Nagpapadala…' : 'Magpadala ng Reset Link →'}
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              /* ── LOGIN MODE ── */
+              <>
+                <h1 className="auth-form-heading">Welcome back 👋</h1>
+                <p className="auth-form-sub">Sign in sa iyong FollowShop account</p>
+
+                {error && (
+                  <div className="auth-error">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <div className="auth-field">
+                  <label className="auth-label">Email</label>
+                  <input
+                    className="auth-input"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="you@email.com"
+                  />
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label">Password</label>
+                  <input
+                    className="auth-input"
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                {/* ── Forgot Password Link ── */}
+                <div className="auth-forgot-row">
+                  <button className="auth-forgot-link" onClick={() => { setForgotMode(true); setError('') }}>
+                    Nakalimutan ang password?
+                  </button>
+                </div>
+
+                <button className="auth-btn" onClick={handleLogin} disabled={loading}>
+                  {loading ? 'Signing in…' : 'Sign in →'}
+                </button>
+
+                <div className="auth-divider" />
+
+                <div className="auth-footer">
+                  Wala pang account?{' '}
+                  <Link href="/signup">Mag-sign up — libre</Link>
+                </div>
+              </>
             )}
-
-            <div className="auth-field">
-              <label className="auth-label">Email</label>
-              <input
-                className="auth-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="you@email.com"
-              />
-            </div>
-
-            <div className="auth-field">
-              <label className="auth-label">Password</label>
-              <input
-                className="auth-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button className="auth-btn" onClick={handleLogin} disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign in →'}
-            </button>
-
-            <div className="auth-divider" />
-
-            <div className="auth-footer">
-              Wala pang account?{' '}
-              <Link href="/signup">Mag-sign up — libre</Link>
-            </div>
           </div>
 
         </div>

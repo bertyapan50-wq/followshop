@@ -3,19 +3,21 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { detectCurrency, formatPrice, PRICES, type Currency } from '@/lib/currency'
 
 export default function Home() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
+  const [currency, setCurrency] = useState<Currency>('USD')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace('/dashboard')
-      } else {
-        setChecking(false)
-      }
+      if (session) router.replace('/dashboard')
+      else setChecking(false)
     })
+    setCurrency(detectCurrency())
   }, [])
 
   if (checking) {
@@ -29,6 +31,20 @@ export default function Home() {
     )
   }
 
+  const isAnnual = billing === 'annual'
+  const isPHP = currency === 'PHP'
+
+  function getPrice(plan: 'starter' | 'pro') {
+    const cycle = isAnnual ? 'annual' : 'monthly'
+    return formatPrice(PRICES[plan][cycle][currency], currency)
+  }
+
+  function getAnnualNote(plan: 'starter' | 'pro') {
+    const annual = PRICES[plan].annual[currency]
+    const total = Math.round(annual * 12)
+    return `billed ${isPHP ? '₱' : '$'}${total}/year`
+  }
+
   return (
     <>
       <style>{`
@@ -38,7 +54,6 @@ export default function Home() {
 
         :root {
           --orange: #EE4D2D;
-          --orange-light: #FF6B47;
           --orange-dim: rgba(238,77,45,0.08);
           --orange-border: rgba(238,77,45,0.2);
           --bg: #FFFFFF;
@@ -51,364 +66,164 @@ export default function Home() {
         }
 
         html { scroll-behavior: smooth; }
-        body {
-          background: var(--bg);
-          color: var(--text);
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          line-height: 1.6;
-          overflow-x: hidden;
-        }
+        body { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1.6; overflow-x: hidden; }
 
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(-8px); }
-        }
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.3; }
-        }
-        @keyframes marquee {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-        .fade-up  { animation: fadeUp 0.6s ease both; }
-        .delay-1  { animation-delay: 0.1s; }
-        .delay-2  { animation-delay: 0.2s; }
-        .delay-3  { animation-delay: 0.3s; }
-        .delay-4  { animation-delay: 0.45s; }
+        .fade-up { animation: fadeUp 0.6s ease both; }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.45s; }
 
-        /* NAV */
         nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 100;
           height: 64px; padding: 0 40px;
           display: flex; align-items: center; justify-content: space-between;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(12px);
+          background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
           border-bottom: 1px solid var(--border);
         }
-        .nav-logo {
-          font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800;
-          color: var(--text); text-decoration: none;
-          display: flex; align-items: center; gap: 8px;
-        }
-        .nav-logo-dot {
-          width: 8px; height: 8px; border-radius: 50%;
-          background: var(--orange); display: inline-block;
-          animation: blink 2s ease infinite;
-        }
+        .nav-logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+        .nav-logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); display: inline-block; animation: blink 2s ease infinite; }
         .nav-links { display: flex; align-items: center; gap: 28px; }
-        .nav-links a {
-          color: var(--sub); font-size: 14px; font-weight: 500;
-          text-decoration: none; transition: color .15s;
-        }
+        .nav-links a { color: var(--sub); font-size: 14px; font-weight: 500; text-decoration: none; transition: color .15s; }
         .nav-links a:hover { color: var(--orange); }
-        .nav-cta {
-          background: var(--orange) !important; color: #fff !important;
-          padding: 8px 18px !important; border-radius: 8px !important;
-          font-weight: 700 !important;
-        }
-        .hamburger {
-          display: none; flex-direction: column; gap: 5px;
-          background: none; border: none; cursor: pointer; padding: 4px;
-        }
+        .nav-cta { background: var(--orange) !important; color: #fff !important; padding: 8px 18px !important; border-radius: 8px !important; font-weight: 700 !important; }
+        .hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
         .hamburger span { display: block; width: 22px; height: 2px; background: var(--text); border-radius: 2px; }
-        .mobile-menu {
-          display: none; position: fixed; top: 64px; left: 0; right: 0; z-index: 99;
-          background: #fff; border-bottom: 1px solid var(--border);
-          padding: 20px 24px; flex-direction: column; gap: 16px;
-        }
+        .mobile-menu { display: none; position: fixed; top: 64px; left: 0; right: 0; z-index: 99; background: #fff; border-bottom: 1px solid var(--border); padding: 20px 24px; flex-direction: column; gap: 16px; }
         .mobile-menu.open { display: flex; }
-        .mobile-menu a {
-          color: var(--sub); font-size: 15px; font-weight: 500;
-          text-decoration: none; padding: 8px 0; border-bottom: 1px solid var(--border);
-        }
+        .mobile-menu a { color: var(--sub); font-size: 15px; font-weight: 500; text-decoration: none; padding: 8px 0; border-bottom: 1px solid var(--border); }
         .mobile-menu a:last-child { border-bottom: none; }
-        .mob-cta {
-          background: var(--orange); color: #fff !important; text-align: center;
-          padding: 12px !important; border-radius: 10px; font-weight: 700 !important;
-          border-bottom: none !important;
-        }
+        .mob-cta { background: var(--orange); color: #fff !important; text-align: center; padding: 12px !important; border-radius: 10px; font-weight: 700 !important; border-bottom: none !important; }
 
-        /* HERO */
-        .hero {
-          padding: 120px 24px 80px; text-align: center;
-          position: relative; overflow: hidden;
-        }
-        .hero-bg {
-          position: absolute; inset: 0; pointer-events: none;
-          background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(238,77,45,0.07) 0%, transparent 70%);
-        }
-        .hero-badge {
-          display: inline-flex; align-items: center; gap: 7px;
-          background: var(--orange-dim); border: 1px solid var(--orange-border);
-          padding: 5px 14px; border-radius: 100px;
-          font-size: 13px; font-weight: 600; color: var(--orange); margin-bottom: 24px;
-        }
-        .badge-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--orange); animation: blink 1.5s ease infinite;
-        }
-        h1 {
-          font-family: 'Syne', sans-serif;
-          font-size: clamp(36px, 6vw, 68px); font-weight: 800;
-          line-height: 1.08; letter-spacing: -0.03em;
-          color: var(--text); max-width: 820px; margin: 0 auto 20px;
-        }
+        .hero { padding: 120px 24px 80px; text-align: center; position: relative; overflow: hidden; }
+        .hero-bg { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(238,77,45,0.07) 0%, transparent 70%); }
+        .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: var(--orange-dim); border: 1px solid var(--orange-border); padding: 5px 14px; border-radius: 100px; font-size: 13px; font-weight: 600; color: var(--orange); margin-bottom: 12px; }
+        .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); animation: blink 1.5s ease infinite; }
+        .trial-pill { display: inline-flex; align-items: center; gap: 6px; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 5px 14px; border-radius: 100px; font-size: 13px; font-weight: 600; color: #166534; margin-bottom: 20px; }
+        h1 { font-family: 'Syne', sans-serif; font-size: clamp(36px, 6vw, 68px); font-weight: 800; line-height: 1.08; letter-spacing: -0.03em; color: var(--text); max-width: 820px; margin: 0 auto 20px; }
         h1 em { font-style: normal; color: var(--orange); }
-        .hero-sub {
-          font-size: clamp(15px, 2vw, 18px); color: var(--sub);
-          max-width: 500px; margin: 0 auto 36px; line-height: 1.7;
-        }
+        .hero-sub { font-size: clamp(15px, 2vw, 18px); color: var(--sub); max-width: 500px; margin: 0 auto 36px; line-height: 1.7; }
         .hero-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
-        .btn-primary {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 13px 26px; border-radius: 10px;
-          background: var(--orange); color: #fff;
-          font-size: 15px; font-weight: 700; text-decoration: none;
-          transition: opacity .2s, transform .2s;
-          box-shadow: 0 4px 20px rgba(238,77,45,0.3);
-          border: none; cursor: pointer; font-family: inherit;
-        }
+        .btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; border-radius: 10px; background: var(--orange); color: #fff; font-size: 15px; font-weight: 700; text-decoration: none; transition: opacity .2s, transform .2s; box-shadow: 0 4px 20px rgba(238,77,45,0.3); border: none; cursor: pointer; font-family: inherit; }
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-outline {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 13px 26px; border-radius: 10px;
-          background: #fff; color: var(--text);
-          font-size: 15px; font-weight: 600; text-decoration: none;
-          border: 1.5px solid var(--border); transition: border-color .2s;
-        }
+        .btn-outline { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; border-radius: 10px; background: #fff; color: var(--text); font-size: 15px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--border); transition: border-color .2s; }
         .btn-outline:hover { border-color: #ccc; }
 
-        /* MOCKUP */
-        .hero-mockup {
-          margin: 56px auto 0; max-width: 760px; width: 100%;
-          background: #fff; border: 1.5px solid var(--border); border-radius: 18px;
-          overflow: hidden;
-          box-shadow: 0 24px 80px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05);
-          animation: float 5s ease-in-out infinite;
-        }
-        .mockup-bar {
-          background: var(--bg2); border-bottom: 1px solid var(--border);
-          padding: 11px 18px; display: flex; align-items: center; gap: 7px;
-        }
+        .hero-mockup { margin: 56px auto 0; max-width: 760px; width: 100%; background: #fff; border: 1.5px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05); animation: float 5s ease-in-out infinite; }
+        .mockup-bar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 11px 18px; display: flex; align-items: center; gap: 7px; }
         .m-dot { width: 11px; height: 11px; border-radius: 50%; }
         .mockup-body { padding: 20px; }
-        .mock-stats {
-          display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
-        }
-        .mock-stat {
-          background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
-        }
+        .mock-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+        .mock-stat { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
         .mock-stat-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
         .mock-stat-value { font-size: 22px; font-weight: 800; font-family: 'Syne', sans-serif; }
         .mock-msgs { display: flex; flex-direction: column; gap: 8px; }
-        .mock-msg {
-          background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
-          padding: 12px 14px; display: flex; align-items: center; gap: 12px;
-        }
-        .mock-avatar {
-          width: 34px; height: 34px; border-radius: 9px;
-          background: var(--orange-dim); font-size: 16px;
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
+        .mock-msg { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+        .mock-avatar { width: 34px; height: 34px; border-radius: 9px; background: var(--orange-dim); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .mock-info { flex: 1; min-width: 0; }
         .mock-name { font-size: 13px; font-weight: 700; color: var(--text); }
         .mock-text { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
         .mock-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; flex-shrink: 0; }
         .badge-p { background: rgba(249,115,22,0.1); color: #EA580C; }
         .badge-s { background: rgba(34,197,94,0.1); color: #16A34A; }
-        .mock-copy {
-          padding: 5px 11px; border-radius: 7px;
-          background: var(--orange); color: #fff;
-          font-size: 11px; font-weight: 700; border: none; cursor: pointer; flex-shrink: 0;
-        }
+        .mock-copy { padding: 5px 11px; border-radius: 7px; background: var(--orange); color: #fff; font-size: 11px; font-weight: 700; border: none; cursor: pointer; flex-shrink: 0; }
 
-        /* MARQUEE */
-        .marquee-wrap {
-          overflow: hidden; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-          padding: 13px 0; background: var(--bg2);
-        }
-        .marquee-track {
-          display: flex; gap: 48px; width: max-content;
-          animation: marquee 22s linear infinite;
-        }
-        .marquee-item {
-          font-size: 13px; font-weight: 600; color: var(--muted);
-          display: flex; align-items: center; gap: 8px; white-space: nowrap;
-        }
+        .marquee-wrap { overflow: hidden; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 13px 0; background: var(--bg2); }
+        .marquee-track { display: flex; gap: 48px; width: max-content; animation: marquee 24s linear infinite; }
+        .marquee-item { font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
         .marquee-item .accent { color: var(--orange); }
 
-        /* SECTIONS */
         section { padding: 80px 24px; }
         .container { max-width: 1060px; margin: 0 auto; }
-        .section-tag {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
-          text-transform: uppercase; color: var(--orange); margin-bottom: 14px;
-        }
-        h2 {
-          font-family: 'Syne', sans-serif;
-          font-size: clamp(28px, 4vw, 46px); font-weight: 800;
-          color: var(--text); line-height: 1.1; letter-spacing: -0.02em;
-        }
+        .section-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); margin-bottom: 14px; }
+        h2 { font-family: 'Syne', sans-serif; font-size: clamp(28px, 4vw, 46px); font-weight: 800; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; }
         .section-sub { font-size: 16px; color: var(--sub); max-width: 480px; line-height: 1.7; margin-top: 14px; }
         .alt-bg { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 
-        /* CARDS */
         .cards-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 48px; }
-        .card {
-          background: #fff; border: 1.5px solid var(--border); border-radius: 16px; padding: 24px;
-          transition: border-color .2s, transform .2s;
-        }
+        .card { background: #fff; border: 1.5px solid var(--border); border-radius: 16px; padding: 24px; transition: border-color .2s, transform .2s; }
         .card:hover { border-color: var(--orange-border); transform: translateY(-2px); }
         .card-icon { font-size: 26px; margin-bottom: 14px; }
         .card-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 7px; }
         .card-desc { font-size: 14px; color: var(--sub); line-height: 1.65; }
 
-        /* STEPS */
         .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 48px; }
-        .step-card {
-          background: #fff; border: 1.5px solid var(--border); border-radius: 16px; padding: 24px; text-align: center;
-        }
-        .step-num {
-          width: 44px; height: 44px; border-radius: 12px; background: var(--orange); color: #fff;
-          font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800;
-          display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
-        }
+        .step-card { background: #fff; border: 1.5px solid var(--border); border-radius: 16px; padding: 24px; text-align: center; }
+        .step-num { width: 44px; height: 44px; border-radius: 12px; background: var(--orange); color: #fff; font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
         .step-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 7px; }
         .step-desc { font-size: 14px; color: var(--sub); line-height: 1.65; }
 
-        /* FEATURES */
         .features-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 48px; }
-        .feat-card {
-          background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 22px;
-          display: flex; gap: 16px; align-items: flex-start; transition: border-color .2s;
-        }
+        .feat-card { background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 22px; display: flex; gap: 16px; align-items: flex-start; transition: border-color .2s; }
         .feat-card:hover { border-color: var(--orange-border); }
         .feat-card.highlight { border-color: var(--orange-border); background: var(--orange-dim); }
-        .feat-icon {
-          width: 44px; height: 44px; border-radius: 11px;
-          background: var(--orange-dim); border: 1px solid var(--orange-border);
-          display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
-        }
+        .feat-icon { width: 44px; height: 44px; border-radius: 11px; background: var(--orange-dim); border: 1px solid var(--orange-border); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
         .feat-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
         .feat-desc { font-size: 13px; color: var(--sub); line-height: 1.6; }
-        .feat-new {
-          display: inline-block; font-size: 10px; font-weight: 700;
-          background: var(--orange); color: #fff;
-          padding: 2px 8px; border-radius: 20px; margin-left: 6px;
-          vertical-align: middle; letter-spacing: 0.04em;
-        }
-
-        /* TESTIMONIALS */
-        .testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 48px; }
-        .testi-card { background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 22px; }
-        .testi-stars { color: #F59E0B; font-size: 13px; margin-bottom: 12px; }
-        .testi-text { font-size: 14px; color: var(--sub); line-height: 1.7; margin-bottom: 16px; font-style: italic; }
-        .testi-author { display: flex; align-items: center; gap: 10px; }
-        .testi-avatar {
-          width: 34px; height: 34px; border-radius: 9px; background: var(--orange-dim);
-          font-size: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .testi-name { font-size: 13px; font-weight: 700; color: var(--text); }
-        .testi-role { font-size: 12px; color: var(--muted); }
-
-        /* EARLY ACCESS */
-        .early-access-card {
-          background: #fff; border: 1.5px solid var(--orange-border);
-          border-radius: 18px; padding: 48px 36px; text-align: center;
-          background: linear-gradient(135deg, var(--orange-dim) 0%, #fff 100%);
-          margin-top: 48px;
-        }
-        .early-icon { font-size: 48px; margin-bottom: 16px; }
-        .early-title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
-        .early-sub { font-size: 16px; color: var(--sub); margin-bottom: 28px; line-height: 1.6; max-width: 480px; margin-left: auto; margin-right: auto; }
-        .early-slots {
-          display: inline-flex; align-items: center; gap: 7px;
-          background: #FFF7ED; border: 1px solid #FED7AA;
-          padding: 5px 14px; border-radius: 100px;
-          font-size: 13px; font-weight: 600; color: #C2410C; margin-bottom: 24px;
-        }
+        .feat-new { display: inline-block; font-size: 10px; font-weight: 700; background: var(--orange); color: #fff; padding: 2px 8px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
 
         /* PRICING */
-        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 48px; align-items: start; }
-        .price-card {
-          background: #fff; border: 1.5px solid var(--border); border-radius: 18px; padding: 28px 24px; position: relative;
-        }
+        .pricing-controls { display: flex; align-items: center; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
+        .toggle-track { width: 44px; height: 24px; border-radius: 12px; border: none; background: #D1D5DB; position: relative; cursor: pointer; padding: 0; transition: background .2s; }
+        .toggle-track.on { background: var(--orange); }
+        .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); display: block; }
+        .toggle-track.on .toggle-thumb { left: 23px; }
+        .save-pill { font-size: 11px; background: #F0FDF4; color: #166534; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+        .currency-switch { display: flex; background: var(--bg3); border-radius: 8px; padding: 3px; gap: 3px; }
+        .curr-btn { padding: 4px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; color: var(--muted); }
+        .curr-btn.active { background: #fff; color: var(--orange); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; align-items: start; }
+        .price-card { background: #fff; border: 1.5px solid var(--border); border-radius: 18px; padding: 28px 24px; position: relative; }
         .price-card.featured { border-color: var(--orange); box-shadow: 0 0 0 4px var(--orange-dim); }
-        .price-popular {
-          position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-          background: var(--orange); color: #fff; font-size: 11px; font-weight: 700;
-          letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 14px; border-radius: 100px; white-space: nowrap;
-        }
+        .price-popular { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--orange); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 14px; border-radius: 100px; white-space: nowrap; }
         .price-plan { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-        .price-amount { font-family: 'Syne', sans-serif; font-size: 42px; font-weight: 800; color: var(--text); line-height: 1; }
-        .price-amount sup { font-size: 18px; vertical-align: super; }
-        .price-period { font-size: 13px; color: var(--muted); margin: 4px 0 22px; }
-        .price-divider { height: 1px; background: var(--border); margin-bottom: 20px; }
-        .price-features { list-style: none; display: flex; flex-direction: column; gap: 11px; margin-bottom: 24px; }
-        .price-features li { font-size: 14px; color: var(--sub); display: flex; align-items: center; gap: 9px; }
-        .price-features li::before {
-          content: '✓'; width: 19px; height: 19px; border-radius: 6px;
-          background: rgba(34,197,94,0.1); color: #16A34A;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; flex-shrink: 0;
-        }
-        .price-btn {
-          display: block; width: 100%; padding: 11px; border-radius: 9px; border: none; cursor: pointer;
-          font-size: 14px; font-weight: 700; text-align: center; text-decoration: none;
-          transition: opacity .2s, transform .2s; font-family: inherit;
-        }
+        .price-amount { font-family: 'Syne', sans-serif; font-size: 40px; font-weight: 800; color: var(--text); line-height: 1; }
+        .price-period { font-size: 13px; color: var(--muted); margin: 4px 0 4px; }
+        .price-billed { font-size: 12px; color: var(--muted); margin-bottom: 14px; min-height: 18px; }
+        .price-trial-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #166534; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 3px 10px; border-radius: 20px; margin-bottom: 16px; }
+        .price-divider { height: 1px; background: var(--border); margin-bottom: 16px; }
+        .limit-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--bg3); }
+        .limit-row:last-child { border-bottom: none; }
+        .limit-label { color: var(--muted); }
+        .limit-val { font-weight: 700; color: var(--text); }
+        .price-features { list-style: none; display: flex; flex-direction: column; gap: 9px; margin: 16px 0 20px; }
+        .price-features li { font-size: 13px; color: var(--sub); display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
+        .chk { width: 16px; height: 16px; border-radius: 5px; background: rgba(34,197,94,0.12); color: #16A34A; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+        .lck { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; color: #D1D5DB; }
+        .price-btn { display: block; width: 100%; padding: 11px; border-radius: 9px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; transition: opacity .2s, transform .2s; font-family: inherit; }
         .price-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-        .price-btn-orange { background: var(--orange); color: #fff; }
-        .price-btn-ghost { background: transparent; color: var(--text); border: 1.5px solid var(--border) !important; }
-        .price-btn-soon {
-          background: var(--bg3); color: var(--muted);
-          border: 1.5px solid var(--border) !important; cursor: not-allowed;
-        }
-        .price-btn-soon:hover { opacity: 1; transform: none; }
-        .price-coming-soon {
-          text-align: center; font-size: 11px; color: var(--muted);
-          margin-top: 8px; font-weight: 500;
-        }
+        .p-orange { background: var(--orange); color: #fff; }
+        .p-ghost { background: transparent; color: var(--text); border: 1.5px solid var(--border) !important; }
+        .p-outline { background: #fff; color: var(--orange); border: 1.5px solid var(--orange) !important; }
 
-        /* CTA */
-        .cta-section {
-          text-align: center; padding: 80px 24px 100px;
-          background: var(--orange-dim); border-top: 1px solid var(--orange-border);
-        }
+        .cta-section { text-align: center; padding: 80px 24px 100px; background: var(--orange-dim); border-top: 1px solid var(--orange-border); }
         .cta-section h2 { margin-bottom: 14px; }
         .cta-section p { color: var(--sub); font-size: 17px; margin-bottom: 32px; }
 
-        /* FOOTER */
-        footer {
-          background: var(--bg2); border-top: 1px solid var(--border);
-          padding: 28px 40px; display: flex; align-items: center;
-          justify-content: space-between; flex-wrap: wrap; gap: 16px;
-        }
+        footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
         .footer-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--text); text-decoration: none; }
         .footer-links { display: flex; gap: 20px; }
         .footer-links a { font-size: 13px; color: var(--muted); text-decoration: none; }
         .footer-links a:hover { color: var(--orange); }
         .footer-copy { font-size: 13px; color: var(--muted); }
 
-        /* RESPONSIVE */
         @media (max-width: 768px) {
           nav { padding: 0 20px; }
           .nav-links { display: none; }
           .hamburger { display: flex; }
           .hero { padding: 96px 20px 60px; }
-          .cards-3, .steps-grid, .testi-grid, .pricing-grid, .features-grid { grid-template-columns: 1fr; }
+          .cards-3, .steps-grid, .pricing-grid, .features-grid { grid-template-columns: 1fr; }
           section { padding: 60px 20px; }
           footer { padding: 24px 20px; flex-direction: column; text-align: center; }
           .footer-links { justify-content: center; }
           .mock-copy { display: none; }
+          .pricing-controls { flex-direction: column; align-items: flex-start; }
         }
         @media (max-width: 480px) {
           .hero-ctas { flex-direction: column; align-items: stretch; }
@@ -418,44 +233,38 @@ export default function Home() {
 
       {/* NAV */}
       <nav>
-        <a href="/" className="nav-logo">
-          <span className="nav-logo-dot"></span>
-          FollowShop
-        </a>
+        <a href="/" className="nav-logo"><span className="nav-logo-dot"></span>FollowShop</a>
         <div className="nav-links">
-          <a href="#how">Paano Gumagana</a>
+          <a href="#how">How it Works</a>
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
-          <a href="/login" className="nav-cta">Mag-login →</a>
+          <a href="/login" className="nav-cta">Log in →</a>
         </div>
-        <button className="hamburger" onClick={() => {
-          const m = document.querySelector('.mobile-menu')
-          m?.classList.toggle('open')
-        }} aria-label="Menu">
-          <span></span><span></span><span></span>
+        <button className="hamburger" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
+          <span/><span/><span/>
         </button>
       </nav>
 
-      {/* MOBILE MENU */}
-      <div className="mobile-menu">
-        <a href="#how">Paano Gumagana</a>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="/signup" className="mob-cta">Subukan nang Libre →</a>
+      <div className={`mobile-menu${menuOpen ? ' open' : ''}`}>
+        <a href="#how" onClick={() => setMenuOpen(false)}>How it Works</a>
+        <a href="#features" onClick={() => setMenuOpen(false)}>Features</a>
+        <a href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
+        <a href="/signup" className="mob-cta">Start Free Trial →</a>
       </div>
 
       {/* HERO */}
       <section className="hero">
         <div className="hero-bg"></div>
-        <div className="hero-badge fade-up"><span className="badge-dot"></span>Para sa Shopee Sellers ng Pilipinas</div>
-        <h1 className="fade-up delay-1">I-automate ang<br/><em>follow-up messages</em><br/>sa iyong buyers</h1>
-        <p className="hero-sub fade-up delay-2">Huwag hayaang mawala ang buyers pagkatapos mag-order. Set once — automatic na ang tamang message sa tamang oras.</p>
+        <div className="hero-badge fade-up"><span className="badge-dot"></span>For Shopee, Lazada & TikTok Shop Sellers</div>
+        <div className="trial-pill fade-up">✅ 7-day free trial — no credit card required</div>
+        <h1 className="fade-up delay-1">Automate your<br/><em>buyer follow-ups</em><br/>in minutes</h1>
+        <p className="hero-sub fade-up delay-2">Set rules once — FollowShop automatically queues the right message to the right buyer at the right time.</p>
         <div className="hero-ctas fade-up delay-3">
           <a href="/signup" className="btn-primary">
-            Subukan nang Libre
+            Start Free Trial
             <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </a>
-          <a href="#how" className="btn-outline">Paano gumagana?</a>
+          <a href="#how" className="btn-outline">See how it works</a>
         </div>
         <div className="hero-mockup fade-up delay-4">
           <div className="mockup-bar">
@@ -472,9 +281,9 @@ export default function Home() {
             </div>
             <div className="mock-msgs">
               {[
-                { name: 'Maria Santos', text: 'Hi Maria! Salamat sa iyong order ng Wireless Earbuds. Naihatid na ba?', status: 'Pending', sent: false },
-                { name: 'Juan dela Cruz', text: 'Kumusta ang iyong Phone Case? Pwede ka mag-leave ng review? 😊', status: 'Sent ✓', sent: true },
-                { name: 'Ana Reyes', text: 'Special discount para sa iyong next order! 10% off gamit ang code FOLLOW10', status: 'Pending', sent: false },
+                { name: 'Maria Santos',   text: 'Hi Maria! Salamat sa iyong order ng Wireless Earbuds. Naihatid na ba?',          status: 'Pending', sent: false },
+                { name: 'Juan dela Cruz', text: 'Kumusta ang iyong Phone Case? Pwede ka mag-leave ng review? 😊',                 status: 'Sent ✓',  sent: true  },
+                { name: 'Ana Reyes',      text: 'Special discount para sa iyong next order! 10% off gamit ang code FOLLOW10',     status: 'Pending', sent: false },
               ].map((m, i) => (
                 <div className="mock-msg" key={i}>
                   <div className="mock-avatar">👤</div>
@@ -494,28 +303,28 @@ export default function Home() {
       {/* MARQUEE */}
       <div className="marquee-wrap">
         <div className="marquee-track">
-          {['📦 Automated Follow-ups','⭐ Review Reminders','🔁 Repeat Buyer Campaigns','📋 CSV Import','✉️ Custom Templates','⚡ Rule Builder','🧩 Chrome Extension'].map((item, i) => (
+          {['📦 Automated Follow-ups','⭐ Review Reminders','🔁 Repeat Buyer Detection','📋 CSV Import','✉️ Custom Templates','⚡ Rule Builder','✨ AI Generator','🧩 Chrome Extension'].map((item, i) => (
             <div className="marquee-item" key={i}>{item}</div>
           ))}
-          <div className="marquee-item"><span className="accent">Para sa Shopee Sellers 🇵🇭</span></div>
-          {['📦 Automated Follow-ups','⭐ Review Reminders','🔁 Repeat Buyer Campaigns','📋 CSV Import','✉️ Custom Templates','⚡ Rule Builder','🧩 Chrome Extension'].map((item, i) => (
+          <div className="marquee-item"><span className="accent">PH 🇵🇭 · ID 🇮🇩 · MY 🇲🇾 · BR 🇧🇷 · MX 🇲🇽</span></div>
+          {['📦 Automated Follow-ups','⭐ Review Reminders','🔁 Repeat Buyer Detection','📋 CSV Import','✉️ Custom Templates','⚡ Rule Builder','✨ AI Generator','🧩 Chrome Extension'].map((item, i) => (
             <div className="marquee-item" key={`b${i}`}>{item}</div>
           ))}
-          <div className="marquee-item"><span className="accent">Para sa Shopee Sellers 🇵🇭</span></div>
+          <div className="marquee-item"><span className="accent">PH 🇵🇭 · ID 🇮🇩 · MY 🇲🇾 · BR 🇧🇷 · MX 🇲🇽</span></div>
         </div>
       </div>
 
       {/* PROBLEM */}
       <section className="alt-bg">
         <div className="container">
-          <div className="section-tag">⚠️ Ang Problema</div>
-          <h2>Nawawala ang pera mo<br/>dahil sa walang follow-up</h2>
-          <p className="section-sub">Karamihan sa mga Shopee sellers ay hindi nag-fofollow up — dahil matagal at paulit-ulit ang proseso.</p>
+          <div className="section-tag">⚠️ The Problem</div>
+          <h2>You're losing repeat buyers<br/>without follow-ups</h2>
+          <p className="section-sub">Most sellers skip follow-ups — it's slow, repetitive, and easy to forget.</p>
           <div className="cards-3">
             {[
-              { icon: '🛒', title: 'Buyers hindi bumabalik', desc: 'Nag-order sila once, tapos wala na. Walang follow-up = walang repeat purchase. Repeat buyers ang nagbibigay ng pinaka-malaking kita.' },
-              { icon: '⏰', title: 'Matagal mag-manually send', desc: 'Kung may 50 orders ka kada linggo, mano-mano ka pa ring nagco-copy-paste? Hindi scalable at hindi consistent.' },
-              { icon: '⭐', title: 'Mababa ang reviews', desc: 'Kahit satisfied ang buyer, hindi sila nag-iiwan ng review unless hinihingan. Mas maraming reviews = mas mataas na Shopee ranking.' },
+              { icon: '🛒', title: 'Buyers don\'t come back',     desc: 'One order, then gone. No follow-up means no repeat purchase. Repeat buyers generate the most lifetime revenue.' },
+              { icon: '⏰', title: 'Manual messaging is slow',    desc: '50 orders a week? Copy-pasting messages one by one isn\'t scalable — and it\'s inconsistent.' },
+              { icon: '⭐', title: 'Reviews are left behind',     desc: 'Happy buyers rarely leave reviews unless asked. More reviews = higher Shopee ranking = more sales.' },
             ].map((c, i) => (
               <div className="card" key={i}>
                 <div className="card-icon">{c.icon}</div>
@@ -530,14 +339,14 @@ export default function Home() {
       {/* HOW IT WORKS */}
       <section id="how">
         <div className="container">
-          <div className="section-tag">🚀 Paano Gumagana</div>
-          <h2>Set once,<br/>automatic na ang lahat</h2>
-          <p className="section-sub">Tatlong simpleng hakbang — tapos huwag nang alalahanin pa.</p>
+          <div className="section-tag">🚀 How It Works</div>
+          <h2>Set once,<br/>automated forever</h2>
+          <p className="section-sub">Three simple steps — then sit back and let FollowShop do the work.</p>
           <div className="steps-grid">
             {[
-              { n: '1', title: 'I-upload ang Orders', desc: 'I-export ang orders mula sa Shopee Seller Center, i-import sa FollowShop via CSV — o manual input kung gusto mo.' },
-              { n: '2', title: 'Gumawa ng Rules', desc: 'I-set kung kailan at anong message ang isesend. "3 days after delivery → Thank You + review request." Isang beses lang i-set.' },
-              { n: '3', title: 'I-copy at I-send', desc: 'Araw-araw, makikita mo sa dashboard ang ready-to-send messages. I-copy, i-paste sa Shopee chat — tapos na!' },
+              { n:'1', title:'Import Your Orders',  desc:'Export orders from Shopee Seller Center and import via CSV — or add manually. All buyer data organized automatically.' },
+              { n:'2', title:'Create Rules',         desc:'Set when and what to send. "3 days after delivery → Thank You + review request." Configure once, runs forever.' },
+              { n:'3', title:'Copy & Send',          desc:'Every day your dashboard shows ready-to-send messages. One click to copy, paste into Shopee chat — done.' },
             ].map((s, i) => (
               <div className="step-card" key={i}>
                 <div className="step-num">{s.n}</div>
@@ -553,24 +362,22 @@ export default function Home() {
       <section id="features" className="alt-bg">
         <div className="container">
           <div className="section-tag">✨ Features</div>
-          <h2>Lahat ng kailangan mo<br/>— wala nang kulang</h2>
+          <h2>Everything you need<br/>to grow repeat sales</h2>
           <div className="features-grid">
             {[
-              { icon: '📋', title: 'CSV Import', desc: 'I-export ang orders sa Shopee, i-upload sa FollowShop. Lahat ng buyer data — automatic na naka-organize.' },
-              { icon: '⚡', title: 'Rule Builder', desc: 'Gumawa ng custom rules — "1 day after order", "7 days after delivery", "repeat buyer". Simple at madaling gamitin.' },
-              { icon: '✉️', title: 'Message Templates', desc: 'Templates na may dynamic variables — {{buyer_name}}, {{product}}, {{delivery_date}}. Personalized ang dating ng bawat message.' },
-              { icon: '📬', title: 'Message Queue', desc: 'Ready-to-send messages nasa isang lugar. I-click ang Copy, i-paste sa Shopee. Mark as sent para ma-track.' },
-              { icon: '📊', title: 'Dashboard Overview', desc: 'I-track ang lahat — total orders, delivered, pending messages, active rules. Lahat nakikita sa isang screen.' },
-              { icon: '🔁', title: 'Auto-Scheduling', desc: 'Hindi mo kailangang mag-check araw-araw. Automatic na nag-ge-generate ng messages base sa rules — every hour nag-rurun.' },
-              { icon: '🧩', title: 'Chrome Extension', desc: 'I-install ang FollowShop extension — makita ang lahat ng pending messages kahit nasa Shopee ka na. One-click copy, tapos send!', isNew: true },
+              { icon:'📋', title:'CSV Import',           desc:'Export from Shopee, upload to FollowShop. All buyer data organized instantly — no manual entry needed.' },
+              { icon:'⚡', title:'Rule Builder',          desc:'Create custom triggers — "1 day after order", "7 days after delivery", "repeat buyer". Simple and powerful.' },
+              { icon:'✉️', title:'Message Templates',     desc:'Dynamic variables — {{buyer_name}}, {{product}}, {{delivery_date}}. Every message feels personal.' },
+              { icon:'📬', title:'Message Queue',         desc:'All ready-to-send messages in one place. Click Copy, paste into Shopee. Mark as sent to track.' },
+              { icon:'✨', title:'AI Message Generator',  desc:'Generate professional follow-up templates in seconds — in Taglish, Filipino, or English.', isNew:true },
+              { icon:'📊', title:'Dashboard Overview',    desc:'Track total orders, delivered, queued messages, and active rules — all in one screen.' },
+              { icon:'🔁', title:'Auto-Scheduling',       desc:'FollowShop auto-generates messages based on your rules every hour. No daily check-in needed.' },
+              { icon:'🧩', title:'Chrome Extension',      desc:'See pending messages while on Shopee. One-click copy, then send — without leaving your seller page.', isNew:true },
             ].map((f, i) => (
               <div className={`feat-card${f.isNew ? ' highlight' : ''}`} key={i}>
                 <div className="feat-icon">{f.icon}</div>
                 <div>
-                  <div className="feat-title">
-                    {f.title}
-                    {f.isNew && <span className="feat-new">NEW</span>}
-                  </div>
+                  <div className="feat-title">{f.title}{f.isNew && <span className="feat-new">NEW</span>}</div>
                   <div className="feat-desc">{f.desc}</div>
                 </div>
               </div>
@@ -579,94 +386,116 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIALS — Early Access */}
-      <section>
-        <div className="container">
-          <div className="section-tag">💬 Mga Sabi Nila</div>
-          <h2>Maging isa sa mga<br/>unang makakapagsabi</h2>
-          <div className="early-access-card">
-            <div className="early-icon">🚀</div>
-            <div className="early-title">Bagong-Launch pa lang kami!</div>
-            <p className="early-sub">
-              Naghahanap kami ng mga unang Shopee sellers na magtitry ng FollowShop — libre, walang credit card.
-              Ang iyong feedback ang magiging pundasyon ng product na ito.
-            </p>
-            <div className="early-slots">
-              <span style={{width:7,height:7,borderRadius:'50%',background:'#EE4D2D',display:'inline-block',animation:'blink 1.5s ease infinite'}}></span>
-              Limitado lang ang early access slots
-            </div>
-            <br/>
-            <a href="/signup" className="btn-primary" style={{display:'inline-flex',margin:'0 auto'}}>
-              Maging Beta User — Libre
-              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </a>
-          </div>
-        </div>
-      </section>
-
       {/* PRICING */}
-      <section id="pricing" className="alt-bg">
+      <section id="pricing">
         <div className="container">
           <div className="section-tag">💰 Pricing</div>
-          <h2>Simple ang presyo,<br/>malaki ang value</h2>
-          <p className="section-sub">Subukan nang libre — walang credit card needed.</p>
+          <h2>Simple pricing,<br/>big value</h2>
+          <p className="section-sub">Start free. Upgrade when you're ready. Cancel anytime.</p>
+
+          <div className="pricing-controls">
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:14,color:!isAnnual?'var(--text)':'var(--muted)',fontWeight:!isAnnual?700:400}}>Monthly</span>
+              <button className={`toggle-track${isAnnual?' on':''}`} onClick={() => setBilling(b => b==='monthly'?'annual':'monthly')}>
+                <span className="toggle-thumb"/>
+              </button>
+              <span style={{fontSize:14,color:isAnnual?'var(--text)':'var(--muted)',fontWeight:isAnnual?700:400}}>
+                Annual <span className="save-pill">Save 20%</span>
+              </span>
+            </div>
+            <div style={{width:1,height:24,background:'var(--border)'}}/>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,color:'var(--muted)'}}>Currency:</span>
+              <div className="currency-switch">
+                {(['USD','PHP'] as Currency[]).map(c => (
+                  <button key={c} className={`curr-btn${currency===c?' active':''}`} onClick={()=>setCurrency(c)}>
+                    {c==='USD'?'USD $':'PHP ₱'}
+                  </button>
+                ))}
+              </div>
+              {isPHP && <span style={{fontSize:11,color:'var(--muted)'}}>🇵🇭 auto-detected</span>}
+            </div>
+          </div>
+
           <div className="pricing-grid">
+
+            {/* FREE */}
             <div className="price-card">
               <div className="price-plan">Free</div>
-              <div className="price-amount"><sup>₱</sup>0</div>
-              <div className="price-period">habang buhay</div>
-              <div className="price-divider"></div>
+              <div className="price-amount">{isPHP?'₱':'$'}0</div>
+              <div className="price-period">forever</div>
+              <div className="price-billed">&nbsp;</div>
+              <div className="price-divider"/>
+              <div style={{marginBottom:14}}>
+                {[['Active rules','1'],['Templates','3'],['Orders / mo','30']].map(([l,v])=>(
+                  <div className="limit-row" key={l}><span className="limit-label">{l}</span><span className="limit-val">{v}</span></div>
+                ))}
+              </div>
               <ul className="price-features">
-                <li>50 orders / buwan</li>
-                <li>3 message templates</li>
-                <li>2 active rules</li>
-                <li>Basic dashboard</li>
-                <li>Chrome Extension</li>
+                <li><span className="chk">✓</span>Message queue</li>
+                <li><span className="chk">✓</span>Basic triggers (2)</li>
+                <li><span className="lck"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg></span><span style={{color:'var(--muted)'}}>AI generation</span></li>
+                <li><span className="lck"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg></span><span style={{color:'var(--muted)'}}>All 8 triggers</span></li>
               </ul>
-              <a href="/signup" className="price-btn price-btn-orange">Magsimula nang Libre</a>
+              <a href="/signup" className="price-btn p-ghost">Get started free</a>
             </div>
+
+            {/* STARTER */}
             <div className="price-card featured">
-              <div className="price-popular">Coming Soon</div>
-              <div className="price-plan">Pro</div>
-              <div className="price-amount"><sup>₱</sup>299</div>
-              <div className="price-period">bawat buwan</div>
-              <div className="price-divider"></div>
+              <div className="price-popular">Most Popular</div>
+              <div className="price-plan">Starter</div>
+              <div className="price-amount">{getPrice('starter')}</div>
+              <div className="price-period">/ month</div>
+              <div className="price-billed">{isAnnual ? getAnnualNote('starter') : '\u00a0'}</div>
+              <div className="price-trial-badge">✅ 7-day free trial</div>
+              <div className="price-divider"/>
+              <div style={{marginBottom:14}}>
+                {[['Active rules','5'],['Templates','15'],['Orders / mo','300']].map(([l,v])=>(
+                  <div className="limit-row" key={l}><span className="limit-label">{l}</span><span className="limit-val">{v}</span></div>
+                ))}
+              </div>
               <ul className="price-features">
-                <li>Unlimited orders</li>
-                <li>Unlimited templates</li>
-                <li>Unlimited rules</li>
-                <li>Priority message queue</li>
-                <li>Email support</li>
+                <li><span className="chk">✓</span>All 8 triggers</li>
+                <li><span className="chk">✓</span>AI generation (15/mo)</li>
+                <li><span className="chk">✓</span>no_review + repeat_buyer</li>
+                <li><span className="lck"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg></span><span style={{color:'var(--muted)'}}>Priority support</span></li>
               </ul>
-              <a href="mailto:hello@followshop.com?subject=Notify me about Pro plan" className="price-btn price-btn-soon">I-notify ako kapag available</a>
-              <p className="price-coming-soon">📧 Ipadala namin sa email mo</p>
+              <a href="/signup?plan=starter" className="price-btn p-orange">Start 7-day trial</a>
             </div>
+
+            {/* PRO */}
             <div className="price-card">
-              <div className="price-plan">Business</div>
-              <div className="price-amount"><sup>₱</sup>599</div>
-              <div className="price-period">bawat buwan</div>
-              <div className="price-divider"></div>
+              <div className="price-plan">Pro</div>
+              <div className="price-amount">{getPrice('pro')}</div>
+              <div className="price-period">/ month</div>
+              <div className="price-billed">{isAnnual ? getAnnualNote('pro') : '\u00a0'}</div>
+              <div className="price-trial-badge">✅ 7-day free trial</div>
+              <div className="price-divider"/>
+              <div style={{marginBottom:14}}>
+                {[['Active rules','Unlimited'],['Templates','Unlimited'],['Orders / mo','Unlimited']].map(([l,v])=>(
+                  <div className="limit-row" key={l}><span className="limit-label">{l}</span><span className="limit-val">{v}</span></div>
+                ))}
+              </div>
               <ul className="price-features">
-                <li>Lahat ng Pro features</li>
-                <li>Multiple shops</li>
-                <li>Team access</li>
-                <li>Smart message AI</li>
-                <li>Priority support</li>
+                <li><span className="chk">✓</span>Everything in Starter</li>
+                <li><span className="chk">✓</span>Unlimited AI generation</li>
+                <li><span className="chk">✓</span>Priority support</li>
+                <li><span className="chk">✓</span>Early feature access</li>
               </ul>
-              <a href="mailto:hello@followshop.com?subject=Notify me about Business plan" className="price-btn price-btn-soon">I-notify ako kapag available</a>
-              <p className="price-coming-soon">📧 Ipadala namin sa email mo</p>
+              <a href="/signup?plan=pro" className="price-btn p-outline">Start 7-day trial</a>
             </div>
+
           </div>
         </div>
       </section>
 
       {/* CTA */}
       <section className="cta-section">
-        <div className="section-tag" style={{justifyContent:'center'}}>🚀 Simulan Na</div>
-        <h2>Handa ka na bang<br/>mag-automate?</h2>
-        <p>Libre ang magsimula. Walang credit card. Setup in 5 minutes.</p>
+        <div className="section-tag" style={{justifyContent:'center'}}>🚀 Get Started</div>
+        <h2>Ready to automate<br/>your follow-ups?</h2>
+        <p>Free to start. 7-day trial on paid plans. No credit card needed.</p>
         <a href="/signup" className="btn-primary" style={{margin:'0 auto',fontSize:16,padding:'15px 32px'}}>
-          Gumawa ng Account — Libre
+          Create Free Account
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </a>
       </section>
@@ -677,9 +506,10 @@ export default function Home() {
         <div className="footer-links">
           <a href="#">Privacy</a>
           <a href="#">Terms</a>
-          <a href="mailto:hello@followshop.com">Contact</a>
+          <a href="/pricing">Pricing</a>
+          <a href="mailto:hello@followshop.app">Contact</a>
         </div>
-        <span className="footer-copy">© 2025 FollowShop. Made in 🇵🇭</span>
+        <span className="footer-copy">© 2025 FollowShop. Made with ❤️ for SEA sellers.</span>
       </footer>
     </>
   )

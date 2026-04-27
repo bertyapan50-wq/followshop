@@ -14,11 +14,21 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
-      setLoading(false)
-      return
-    }
+    if (password.length < 8) {
+  setError('Password must be at least 8 characters.')
+  setLoading(false)
+  return
+}
+if (!/[A-Z]/.test(password)) {
+  setError('Password must contain at least one uppercase letter.')
+  setLoading(false)
+  return
+}
+if (!/[0-9]/.test(password)) {
+  setError('Password must contain at least one number.')
+  setLoading(false)
+  return
+}
 
     const { data, error } = await supabase.auth.signUp({ email, password })
 
@@ -280,29 +290,55 @@ export default function SignupPage() {
             )}
 
             <div className="auth-field">
-              <label className="auth-label">Email</label>
-              <input
-                className="auth-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="you@email.com"
-              />
-            </div>
+  <label className="auth-label">Password</label>
+  <input
+    className="auth-input"
+    type="password"
+    value={password}
+    onChange={e => setPassword(e.target.value)}
+    onKeyDown={handleKeyDown}
+    placeholder="••••••••"
+  />
 
-            <div className="auth-field">
-              <label className="auth-label">Password</label>
-              <input
-                className="auth-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="••••••••"
-              />
-              <p className="auth-hint">Minimum 6 characters</p>
+  {/* Strength indicator */}
+  {password.length > 0 && (() => {
+    const hasUpper = /[A-Z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+    const hasLength = password.length >= 8
+    const score = [hasUpper, hasNumber, hasLength].filter(Boolean).length
+    const levels = [
+      { label: 'Weak', color: '#EF4444', width: '33%' },
+      { label: 'Fair', color: '#F97316', width: '66%' },
+      { label: 'Strong', color: '#22C55E', width: '100%' },
+    ]
+    const level = levels[score - 1] || levels[0]
+    return (
+      <div style={{ marginTop: 8 }}>
+        {/* Bar */}
+        <div style={{ height: 4, background: '#F3F4F6', borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+          <div style={{ height: '100%', width: level.width, background: level.color, borderRadius: 4, transition: 'all .3s' }} />
+        </div>
+        {/* Requirements */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {[
+            { label: 'At least 8 characters', met: hasLength },
+            { label: 'One uppercase letter (A-Z)', met: hasUpper },
+            { label: 'One number (0-9)', met: hasNumber },
+          ].map(req => (
+            <div key={req.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: req.met ? '#22C55E' : '#9CA3AF', fontWeight: 600 }}>
+                {req.met ? '✓' : '○'}
+              </span>
+              <span style={{ fontSize: 11, color: req.met ? '#374151' : '#9CA3AF' }}>
+                {req.label}
+              </span>
             </div>
+          ))}
+        </div>
+      </div>
+    )
+  })()}
+</div>
 
             <button className="auth-btn" onClick={handleSignup} disabled={loading}>
               {loading ? 'Creating account…' : 'Create account →'}

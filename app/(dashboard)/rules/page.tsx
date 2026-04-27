@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,22 @@ interface FormState {
   trigger: string
   message_template: string
   is_active: boolean
+}
+
+type Plan = 'free' | 'starter' | 'pro'
+
+// ─── Plan limits ──────────────────────────────────────────────────────────────
+
+const PLAN_LIMITS: Record<Plan, number> = {
+  free: 1,
+  starter: 5,
+  pro: Infinity,
+}
+
+const PLAN_LABELS: Record<Plan, string> = {
+  free: 'Free',
+  starter: 'Starter',
+  pro: 'Pro',
 }
 
 const EMPTY_FORM: FormState = {
@@ -59,17 +76,15 @@ const TRIGGERS = [
   },
 ]
 
-// Flat map for lookup
 const TRIGGER_MAP: Record<string, { label: string; icon: string; desc: string }> = {}
 TRIGGERS.forEach(g => g.options.forEach(o => { TRIGGER_MAP[o.value] = o }))
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RulesPage() {
-  
-
   const [rules, setRules] = useState<Rule[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [plan, setPlan] = useState<Plan>('free')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -82,18 +97,32 @@ export default function RulesPage() {
 
   async function fetchAll() {
     setLoading(true)
-    const [rulesRes, templatesRes] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const [rulesRes, templatesRes, subRes] = await Promise.all([
       supabase.from('rules').select('*').order('created_at', { ascending: false }),
       supabase.from('templates').select('id, name, content').order('name'),
+      user ? supabase.from('subscriptions').select('plan').eq('user_id', user.id).single() : Promise.resolve({ data: null, error: null }),
     ])
+
     if (rulesRes.error) notify(rulesRes.error.message, 'error')
     else setRules(rulesRes.data || [])
+
     if (templatesRes.error) notify(templatesRes.error.message, 'error')
     else setTemplates(templatesRes.data || [])
+
+    if (subRes.data?.plan) setPlan(subRes.data.plan as Plan)
+
     setLoading(false)
   }
 
   useEffect(() => { fetchAll() }, [])
+
+  // ── Limit check ───────────────────────────────────────────────────────────
+
+  const activeRules = rules.filter(r => r.is_active).length
+  const limit = PLAN_LIMITS[plan]
+  const isAtLimit = activeRules >= limit && plan !== 'pro'
 
   // ── Notify ────────────────────────────────────────────────────────────────
 
@@ -109,24 +138,27 @@ export default function RulesPage() {
     if (!form.trigger) return notify('Please select a trigger.', 'error')
     if (!form.message_template) return notify('Please select a template.', 'error')
 
-    // Check for duplicate trigger (excluding current edit)
     const duplicate = rules.find(r => r.trigger === form.trigger && r.id !== editingId)
     if (duplicate) return notify('A rule with this trigger already exists.', 'error')
+
+    // Double-check limit on submit (backend guard)
+    if (!editingId && isAtLimit) {
+      return notify(`You've reached the ${PLAN_LABELS[plan]} plan limit of ${limit} active rule${limit !== 1 ? 's' : ''}. Upgrade to add more.`, 'error')
+    }
 
     setSubmitting(true)
     if (editingId) {
       const { error } = await supabase.from('rules')
         .update({ trigger: form.trigger, message_template: form.message_template, is_active: form.is_active })
         .eq('id', editingId)
-      if (error) { notify(error.message, 'error'); setSubmitting(false); return }
+      if (error) { notify(parseDbError(error.message), 'error'); setSubmitting(false); return }
       notify('Rule updated!', 'success')
     } else {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { notify('Not logged in.', 'error'); setSubmitting(false); return }
-
       const { error } = await supabase.from('rules')
         .insert([{ trigger: form.trigger, message_template: form.message_template, is_active: form.is_active, user_id: user.id }])
-      if (error) { notify(error.message, 'error'); setSubmitting(false); return }
+      if (error) { notify(parseDbError(error.message), 'error'); setSubmitting(false); return }
       notify('Rule created!', 'success')
     }
     setSubmitting(false)
@@ -134,17 +166,15 @@ export default function RulesPage() {
     fetchAll()
   }
 
-  // ── Toggle active ─────────────────────────────────────────────────────────
-
   async function toggleActive(rule: Rule) {
-    const { error } = await supabase.from('rules')
-      .update({ is_active: !rule.is_active })
-      .eq('id', rule.id)
-    if (error) return notify(error.message, 'error')
+    // Prevent activating if at limit
+    if (!rule.is_active && isAtLimit) {
+      return notify(`You've reached the ${PLAN_LABELS[plan]} plan limit of ${limit} active rule${limit !== 1 ? 's' : ''}. Upgrade to activate more.`, 'error')
+    }
+    const { error } = await supabase.from('rules').update({ is_active: !rule.is_active }).eq('id', rule.id)
+    if (error) return notify(parseDbError(error.message), 'error')
     setRules(rs => rs.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r))
   }
-
-  // ── Edit ──────────────────────────────────────────────────────────────────
 
   function handleEdit(rule: Rule) {
     setEditingId(rule.id)
@@ -153,17 +183,13 @@ export default function RulesPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-
   async function handleDelete(id: string) {
     if (!confirm('Delete this rule?')) return
     const { error } = await supabase.from('rules').delete().eq('id', id)
-    if (error) return notify(error.message, 'error')
+    if (error) return notify(parseDbError(error.message), 'error')
     notify('Rule deleted.', 'success')
     fetchAll()
   }
-
-  // ── Reset ─────────────────────────────────────────────────────────────────
 
   function resetForm() {
     setForm(EMPTY_FORM)
@@ -171,7 +197,17 @@ export default function RulesPage() {
     setShowForm(false)
   }
 
-  // ── Selected template preview ─────────────────────────────────────────────
+  // ── Handle New Rule button click ──────────────────────────────────────────
+
+  function handleNewRuleClick() {
+    if (isAtLimit && !editingId) {
+      // Don't open form — show limit reached state
+      notify(`You've reached the ${PLAN_LABELS[plan]} plan limit (${limit} active rule${limit !== 1 ? 's' : ''}). Upgrade to add more.`, 'error')
+      return
+    }
+    resetForm()
+    setShowForm(v => !v)
+  }
 
   const selectedTemplate = templates.find(t => t.id === form.message_template)
 
@@ -186,23 +222,75 @@ export default function RulesPage() {
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Rules</h1>
           <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
-            {rules.filter(r => r.is_active).length} active rule{rules.filter(r => r.is_active).length !== 1 ? 's' : ''}
+            {activeRules} / {plan === 'pro' ? '∞' : limit} active rule{limit !== 1 ? 's' : ''}
+            {plan !== 'pro' && (
+              <span style={{ marginLeft: 8, fontSize: 12, color: isAtLimit ? '#EF4444' : '#9CA3AF', fontWeight: isAtLimit ? 700 : 400 }}>
+                {isAtLimit ? '— limit reached' : `(${limit - activeRules} remaining)`}
+              </span>
+            )}
           </p>
         </div>
         <button
-          onClick={() => { resetForm(); setShowForm(v => !v) }}
+          onClick={handleNewRuleClick}
           style={{
             display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
-            background: '#EE4D2D', color: '#fff', border: 'none', borderRadius: 10,
-            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            background: isAtLimit ? '#F3F4F6' : '#EE4D2D',
+            color: isAtLimit ? '#9CA3AF' : '#fff',
+            border: isAtLimit ? '1.5px solid #E5E7EB' : 'none',
+            borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            transition: 'all .15s',
           }}
         >
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New Rule
+          {isAtLimit ? (
+            <>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 16 16">
+                <rect x="3" y="7" width="10" height="7" rx="2"/>
+                <path d="M5 7V5a3 3 0 0 1 6 0v2"/>
+              </svg>
+              Limit Reached
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              New Rule
+            </>
+          )}
         </button>
       </div>
+
+      {/* ── Plan Limit Banner ── */}
+      {isAtLimit && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FFF7ED 0%, #FFF1EE 100%)',
+          border: '1.5px solid #FED7AA', borderRadius: 14,
+          padding: '18px 20px', marginBottom: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FFF1EE', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+              🔒
+            </div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#C2410C', margin: '0 0 3px' }}>
+                {PLAN_LABELS[plan]} plan limit reached — {limit} active rule{limit !== 1 ? 's' : ''} max
+              </p>
+              <p style={{ fontSize: 13, color: '#92400E', margin: 0 }}>
+                Upgrade to {plan === 'free' ? 'Starter (5 rules)' : 'Pro (unlimited)'} to create more automation rules.
+              </p>
+            </div>
+          </div>
+          <Link href="/pricing" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', background: '#EE4D2D', color: '#fff',
+            border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+            Upgrade Plan →
+          </Link>
+        </div>
+      )}
 
       {/* ── Toasts ── */}
       {success && <Toast msg={success} type="success" />}
@@ -222,7 +310,7 @@ export default function RulesPage() {
       )}
 
       {/* ── Rule Form ── */}
-      {showForm && (
+      {showForm && !isAtLimit && (
         <div style={{
           background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14,
           padding: 24, marginBottom: 28, boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
@@ -232,39 +320,16 @@ export default function RulesPage() {
           </h2>
 
           <form onSubmit={handleSubmit}>
-
-            {/* Flow diagram: Trigger → Template */}
+            {/* Flow diagram */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24,
-              padding: '14px 18px', background: '#F8FAFC', borderRadius: 12,
-              border: '1px solid #E2E8F0',
+              padding: '14px 18px', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0',
             }}>
-              <FlowStep
-                icon="⚡"
-                label="Trigger"
-                value={form.trigger ? TRIGGER_MAP[form.trigger]?.label : 'Not selected'}
-                active={!!form.trigger}
-              />
-              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-              <FlowStep
-                icon="✉️"
-                label="Send Template"
-                value={selectedTemplate ? selectedTemplate.name : 'Not selected'}
-                active={!!form.message_template}
-              />
-              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-              <FlowStep
-                icon="📬"
-                label="Message Queued"
-                value="Auto-scheduled"
-                active={!!(form.trigger && form.message_template)}
-              />
+              <FlowStep icon="⚡" label="Trigger" value={form.trigger ? TRIGGER_MAP[form.trigger]?.label : 'Not selected'} active={!!form.trigger} />
+              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              <FlowStep icon="✉️" label="Send Template" value={selectedTemplate ? selectedTemplate.name : 'Not selected'} active={!!form.message_template} />
+              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              <FlowStep icon="📬" label="Message Queued" value="Auto-scheduled" active={!!(form.trigger && form.message_template)} />
             </div>
 
             {/* Step 1: Trigger */}
@@ -281,10 +346,7 @@ export default function RulesPage() {
                         const isUsed = rules.some(r => r.trigger === opt.value && r.id !== editingId)
                         const isSelected = form.trigger === opt.value
                         return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            disabled={isUsed}
+                          <button key={opt.value} type="button" disabled={isUsed}
                             onClick={() => setForm(f => ({ ...f, trigger: opt.value }))}
                             title={isUsed ? 'Already used in another rule' : opt.desc}
                             style={{
@@ -292,12 +354,9 @@ export default function RulesPage() {
                               border: `1.5px solid ${isSelected ? '#EE4D2D' : '#E5E7EB'}`,
                               background: isSelected ? '#FFF1EE' : isUsed ? '#F9FAFB' : '#fff',
                               color: isSelected ? '#EE4D2D' : isUsed ? '#D1D5DB' : '#374151',
-                              fontSize: 13, fontWeight: 500,
-                              display: 'flex', alignItems: 'center', gap: 6,
-                              opacity: isUsed ? 0.6 : 1,
-                              transition: 'all .15s',
-                            }}
-                          >
+                              fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6,
+                              opacity: isUsed ? 0.6 : 1, transition: 'all .15s',
+                            }}>
                             <span>{opt.icon}</span>
                             {opt.label}
                             {isUsed && <span style={{ fontSize: 10, color: '#9CA3AF' }}>(in use)</span>}
@@ -320,37 +379,25 @@ export default function RulesPage() {
                   {templates.map(t => {
                     const isSelected = form.message_template === t.id
                     return (
-                      <button
-                        key={t.id}
-                        type="button"
+                      <button key={t.id} type="button"
                         onClick={() => setForm(f => ({ ...f, message_template: t.id }))}
                         style={{
                           padding: '12px 16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                           border: `1.5px solid ${isSelected ? '#EE4D2D' : '#E5E7EB'}`,
-                          background: isSelected ? '#FFF1EE' : '#fff',
-                          transition: 'all .15s',
-                        }}
-                      >
+                          background: isSelected ? '#FFF1EE' : '#fff', transition: 'all .15s',
+                        }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{
-                            width: 32, height: 32, borderRadius: 8,
-                            background: isSelected ? '#FFDDD7' : '#F3F4F6',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: isSelected ? '#FFDDD7' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <svg width="15" height="15" fill="none" stroke={isSelected ? '#EE4D2D' : '#9CA3AF'} strokeWidth="1.8" viewBox="0 0 24 24">
                               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                             </svg>
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{ fontWeight: 600, color: isSelected ? '#EE4D2D' : '#111', margin: 0, fontSize: 14 }}>{t.name}</p>
-                            <p style={{ fontSize: 12, color: '#9CA3AF', margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {t.content}
-                            </p>
+                            <p style={{ fontSize: 12, color: '#9CA3AF', margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.content}</p>
                           </div>
                           {isSelected && (
-                            <svg width="18" height="18" fill="none" stroke="#EE4D2D" strokeWidth="2.5" viewBox="0 0 24 24">
-                              <polyline points="20 6 9 17 4 12"/>
-                            </svg>
+                            <svg width="18" height="18" fill="none" stroke="#EE4D2D" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                           )}
                         </div>
                       </button>
@@ -370,15 +417,8 @@ export default function RulesPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={resetForm} style={{
-                padding: '9px 18px', borderRadius: 9, border: '1.5px solid #E5E7EB',
-                background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#374151',
-              }}>Cancel</button>
-              <button type="submit" disabled={submitting} style={{
-                padding: '9px 22px', borderRadius: 9, border: 'none',
-                background: submitting ? '#F87171' : '#EE4D2D', color: '#fff',
-                fontSize: 14, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer',
-              }}>
+              <button type="button" onClick={resetForm} style={{ padding: '9px 18px', borderRadius: 9, border: '1.5px solid #E5E7EB', background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#374151' }}>Cancel</button>
+              <button type="submit" disabled={submitting} style={{ padding: '9px 22px', borderRadius: 9, border: 'none', background: submitting ? '#F87171' : '#EE4D2D', color: '#fff', fontSize: 14, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer' }}>
                 {submitting ? 'Saving…' : editingId ? 'Update Rule' : 'Save Rule'}
               </button>
             </div>
@@ -390,87 +430,46 @@ export default function RulesPage() {
       {loading ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>Loading rules…</div>
       ) : rules.length === 0 ? (
-        <div style={{
-          background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14,
-          padding: 60, textAlign: 'center',
-        }}>
+        <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14, padding: 60, textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>⚡</div>
           <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 6px', fontSize: 15 }}>No rules yet</p>
-          <p style={{ color: '#9CA3AF', fontSize: 13, margin: 0 }}>
-            Create your first rule to start automating follow-up messages.
-          </p>
+          <p style={{ color: '#9CA3AF', fontSize: 13, margin: 0 }}>Create your first rule to start automating follow-up messages.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {rules.map(rule => {
             const triggerInfo = TRIGGER_MAP[rule.trigger]
             const template = templates.find(t => t.id === rule.message_template)
+            const canToggleOn = rule.is_active || !isAtLimit
             return (
               <div key={rule.id} style={{
                 background: '#fff', border: `1.5px solid ${rule.is_active ? '#E5E7EB' : '#F3F4F6'}`,
                 borderRadius: 14, padding: '16px 20px',
                 boxShadow: rule.is_active ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
-                opacity: rule.is_active ? 1 : 0.65,
-                transition: 'all .2s',
+                opacity: rule.is_active ? 1 : 0.65, transition: 'all .2s',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  {/* Trigger badge */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    background: '#FFF7ED', border: '1px solid #FED7AA',
-                    padding: '6px 12px', borderRadius: 20, flexShrink: 0,
-                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#FFF7ED', border: '1px solid #FED7AA', padding: '6px 12px', borderRadius: 20, flexShrink: 0 }}>
                     <span style={{ fontSize: 14 }}>{triggerInfo?.icon || '⚡'}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#C2410C' }}>
-                      {triggerInfo?.label || rule.trigger}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#C2410C' }}>{triggerInfo?.label || rule.trigger}</span>
                   </div>
-
-                  {/* Arrow */}
-                  <svg width="20" height="20" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24">
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                    <polyline points="12 5 19 12 12 19"/>
-                  </svg>
-
-                  {/* Template badge */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    background: '#F0F9FF', border: '1px solid #BAE6FD',
-                    padding: '6px 12px', borderRadius: 20, flexShrink: 0,
-                  }}>
+                  <svg width="20" height="20" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#F0F9FF', border: '1px solid #BAE6FD', padding: '6px 12px', borderRadius: 20, flexShrink: 0 }}>
                     <span style={{ fontSize: 14 }}>✉️</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0369A1' }}>
-                      {template?.name || 'Unknown template'}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0369A1' }}>{template?.name || 'Unknown template'}</span>
                   </div>
-
-                  {/* Spacer */}
                   <div style={{ flex: 1 }} />
-
-                  {/* Toggle */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Toggle value={rule.is_active} onChange={() => toggleActive(rule)} />
+                    <Toggle value={rule.is_active} onChange={() => toggleActive(rule)} disabled={!canToggleOn} />
                     <span style={{ fontSize: 12, color: rule.is_active ? '#15803D' : '#9CA3AF', fontWeight: 500 }}>
-                      {rule.is_active ? 'Active' : 'Inactive'}
+                      {rule.is_active ? 'Active' : !canToggleOn ? 'Limit reached' : 'Inactive'}
                     </span>
                   </div>
-
-                  {/* Edit */}
-                  <button onClick={() => handleEdit(rule)} style={{
-                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    border: '1.5px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer',
-                  }}>Edit</button>
-
-                  {/* Delete */}
-                  <button
-                    onClick={() => handleDelete(rule.id)}
-                    style={{
-                      padding: '7px 10px', borderRadius: 8, border: '1.5px solid #E5E7EB',
-                      background: '#fff', color: '#D1D5DB', cursor: 'pointer', transition: 'color .15s',
-                    }}
+                  <button onClick={() => handleEdit(rule)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: '1.5px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer' }}>Edit</button>
+                  <button onClick={() => handleDelete(rule.id)}
+                    style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #E5E7EB', background: '#fff', color: '#D1D5DB', cursor: 'pointer', transition: 'color .15s' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#D1D5DB')}
-                  >
+                    onMouseLeave={e => (e.currentTarget.style.color = '#D1D5DB')}>
                     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <polyline points="3 6 5 6 21 6"/>
                       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -479,13 +478,7 @@ export default function RulesPage() {
                     </svg>
                   </button>
                 </div>
-
-                {/* Trigger description */}
-                {triggerInfo && (
-                  <p style={{ fontSize: 12, color: '#9CA3AF', margin: '10px 0 0', paddingLeft: 2 }}>
-                    {triggerInfo.desc}
-                  </p>
-                )}
+                {triggerInfo && <p style={{ fontSize: 12, color: '#9CA3AF', margin: '10px 0 0', paddingLeft: 2 }}>{triggerInfo.desc}</p>}
               </div>
             )
           })}
@@ -494,26 +487,31 @@ export default function RulesPage() {
     </div>
   )
 }
+function parseDbError(message: string): string {
+  if (message.includes('RULE_LIMIT_REACHED')) {
+    if (message.includes('free')) return 'Free plan allows 1 active rule. Upgrade to add more.'
+    if (message.includes('starter')) return 'Starter plan allows 5 active rules. Upgrade to Pro for unlimited.'
+  }
+  return message
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
+    <button type="button" onClick={() => !disabled && onChange(!value)}
+      title={disabled ? 'Upgrade to activate more rules' : undefined}
       style={{
-        width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+        width: 42, height: 24, borderRadius: 12, border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         background: value ? '#EE4D2D' : '#D1D5DB',
-        position: 'relative', transition: 'background .2s', flexShrink: 0,
-        padding: 0,
-      }}
-    >
+        position: 'relative', transition: 'background .2s', flexShrink: 0, padding: 0,
+        opacity: disabled ? 0.5 : 1,
+      }}>
       <span style={{
         position: 'absolute', top: 3, left: value ? 21 : 3,
         width: 18, height: 18, borderRadius: '50%', background: '#fff',
-        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-        display: 'block',
+        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', display: 'block',
       }} />
     </button>
   )
@@ -522,21 +520,11 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 function FlowStep({ icon, label, value, active }: { icon: string; label: string; value: string; active: boolean }) {
   return (
     <div style={{ textAlign: 'center', flex: 1 }}>
-      <div style={{
-        width: 42, height: 42, borderRadius: 12, margin: '0 auto 6px',
-        background: active ? '#FFF1EE' : '#F3F4F6',
-        border: `1.5px solid ${active ? '#EE4D2D' : '#E5E7EB'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 18, transition: 'all .2s',
-      }}>
+      <div style={{ width: 42, height: 42, borderRadius: 12, margin: '0 auto 6px', background: active ? '#FFF1EE' : '#F3F4F6', border: `1.5px solid ${active ? '#EE4D2D' : '#E5E7EB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, transition: 'all .2s' }}>
         {icon}
       </div>
-      <p style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 2px' }}>
-        {label}
-      </p>
-      <p style={{ fontSize: 12, fontWeight: 600, color: active ? '#EE4D2D' : '#9CA3AF', margin: 0 }}>
-        {value}
-      </p>
+      <p style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 2px' }}>{label}</p>
+      <p style={{ fontSize: 12, fontWeight: 600, color: active ? '#EE4D2D' : '#9CA3AF', margin: 0 }}>{value}</p>
     </div>
   )
 }
@@ -544,13 +532,7 @@ function FlowStep({ icon, label, value, active }: { icon: string; label: string;
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
   const isSuccess = type === 'success'
   return (
-    <div style={{
-      background: isSuccess ? '#F0FDF4' : '#FEF2F2',
-      border: `1px solid ${isSuccess ? '#BBF7D0' : '#FECACA'}`,
-      color: isSuccess ? '#15803D' : '#B91C1C',
-      padding: '11px 16px', borderRadius: 10, marginBottom: 16,
-      fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8,
-    }}>
+    <div style={{ background: isSuccess ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${isSuccess ? '#BBF7D0' : '#FECACA'}`, color: isSuccess ? '#15803D' : '#B91C1C', padding: '11px 16px', borderRadius: 10, marginBottom: 16, fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
       {isSuccess
         ? <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         : <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -559,8 +541,6 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
     </div>
   )
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10,
