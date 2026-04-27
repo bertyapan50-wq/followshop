@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import type { Plan, SubscriptionStatus } from '@/types'
 
@@ -7,23 +6,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-function verifySignature(payload: string, signature: string): boolean {
-  try {
-    const secret = process.env.DODO_WEBHOOK_SECRET!
-    const actualSignature = signature.startsWith('v1,')
-      ? signature.slice(3)
-      : signature
-    const hmac = crypto.createHmac('sha256', secret)
-    const digest = hmac.update(payload).digest('base64')
-    return crypto.timingSafeEqual(
-      Buffer.from(digest),
-      Buffer.from(actualSignature)
-    )
-  } catch {
-    return false
-  }
-}
 
 function mapStatus(dodoStatus: string): SubscriptionStatus {
   const statusMap: Record<string, SubscriptionStatus> = {
@@ -42,28 +24,20 @@ function mapStatus(dodoStatus: string): SubscriptionStatus {
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.text()
-    const signature = req.headers.get('webhook-signature') ?? ''
-
-    if (!verifySignature(payload, signature)) {
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      )
-    }
-
     const event = JSON.parse(payload)
+    
+    console.log('Webhook received:', JSON.stringify(event, null, 2))
+    
     const eventType: string = event.type
     const data = event.data
     const userId: string = data?.metadata?.user_id
     const plan: Plan = data?.metadata?.plan ?? 'free'
 
-    console.log(`Dodo Webhook: ${eventType} for user ${userId}`)
+    console.log(`Event: ${eventType}, User: ${userId}, Plan: ${plan}`)
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'No user_id in metadata' },
-        { status: 400 }
-      )
+      console.error('No user_id in metadata!')
+      return NextResponse.json({ error: 'No user_id' }, { status: 400 })
     }
 
     if (
@@ -72,6 +46,8 @@ export async function POST(req: NextRequest) {
       eventType === 'subscription.updated' ||
       eventType === 'subscription.resumed'
     ) {
+      console.log('Upserting subscription...')
+      
       const { error } = await supabaseAdmin
         .from('subscriptions')
         .upsert(
@@ -90,29 +66,20 @@ export async function POST(req: NextRequest) {
           { onConflict: 'user_id' }
         )
 
-      if (error) console.error('Supabase upsert error:', error)
-    }
-
-    if (
-      eventType === 'subscription.cancelled' ||
-      eventType === 'subscription.expired'
-    ) {
-      await supabaseAdmin
-        .from('subscriptions')
-        .update({
-          status:     mapStatus(data.status),
-          ends_at:    data.ends_at ?? null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
+      if (error) {
+        console.error('Supabase error:', JSON.stringify(error))
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      
+      console.log('Subscription updated successfully!')
     }
 
     return NextResponse.json({ received: true })
 
-  } catch (err) {
-    console.error('Dodo Webhook error:', err)
+  } catch (err: any) {
+    console.error('Webhook error:', err?.message ?? err)
     return NextResponse.json(
-      { error: 'Webhook processing failed' },
+      { error: err?.message ?? 'Webhook processing failed' },
       { status: 500 }
     )
   }
