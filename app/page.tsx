@@ -507,7 +507,7 @@ export default function Home() {
           <a href="#">Privacy</a>
           <a href="#">Terms</a>
           <a href="/pricing">Pricing</a>
-          <a href="mailto:hello@followshop.app">Contact</a>
+          <a href="mailto:support@followshop.app">Contact</a>
         </div>
         <span className="footer-copy">© 2025 FollowShop. Made with ❤️ for SEA sellers.</span>
       </footer>
