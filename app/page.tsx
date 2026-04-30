@@ -488,7 +488,96 @@ export default function Home() {
           </div>
         </div>
       </section>
+{/* TESTIMONIALS */}
+<section className="alt-bg">
+  <div className="container">
+    <div className="section-tag">💬 What Sellers Say</div>
+    <h2>Trusted by Shopee<br/>sellers across PH</h2>
+    <div className="cards-3" style={{marginTop:40}}>
+      {[
+        {
+          name: 'Maria Santos',
+          shop: 'MariaPH Shop · Cebu',
+          avatar: '👩',
+          stars: 5,
+          text: 'Dati 1-2 oras ako sa pag-copy paste ng messages. Ngayon 5 minutes lang. Yung repeat buyers ko tumaas ng 30% after using FollowShop!',
+        },
+        {
+          name: 'Carlo Reyes',
+          shop: 'TechGadgetsPH · Manila',
+          avatar: '👨',
+          stars: 5,
+          text: 'Yung AI generator is a game changer. Hindi na ko nag-iisip ng messages — generates na siya ng magandang Taglish messages para sa buyers ko.',
+        },
+        {
+          name: 'Ana Villanueva',
+          shop: 'AnaFashion · Davao',
+          avatar: '👩',
+          stars: 5,
+          text: 'Ang daming reviews na natanggap ko after using FollowShop. Dati 3-4 reviews per week, ngayon 15-20 na. Malaking tulong sa ranking ko sa Shopee!',
+        },
+      ].map((t, i) => (
+        <div className="card" key={i} style={{position:'relative'}}>
+          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:16}}>
+            <div style={{
+              width:44,height:44,borderRadius:12,
+              background:'var(--orange-dim)',border:'1px solid var(--orange-border)',
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,
+            }}>{t.avatar}</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:'var(--text)'}}>{t.name}</div>
+              <div style={{fontSize:12,color:'var(--muted)',marginTop:1}}>{t.shop}</div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:2,marginBottom:12}}>
+            {Array.from({length:t.stars}).map((_,j)=>(
+              <span key={j} style={{color:'#F59E0B',fontSize:14}}>★</span>
+            ))}
+          </div>
+          <p style={{fontSize:14,color:'var(--sub)',lineHeight:1.7,margin:0}}>"{t.text}"</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
 
+{/* FAQ */}
+<section>
+  <div className="container">
+    <div className="section-tag">❓ FAQ</div>
+    <h2>Common questions</h2>
+    <div style={{marginTop:40,display:'flex',flexDirection:'column',gap:12,maxWidth:720}}>
+      {[
+        {
+          q: 'Kailangan ba ng Shopee API?',
+          a: 'Hindi! FollowShop works without any API. I-export mo lang ang orders mo mula sa Shopee Seller Center as CSV, i-upload dito, at handa na. Simple lang.',
+        },
+        {
+          q: 'Auto ba talaga ang pag-send ng messages?',
+          a: 'FollowShop automatically generates at queues ang tamang messages based sa iyong rules. Ikaw na lang mag-copy at mag-paste sa Shopee chat — 5 seconds per message.',
+        },
+        {
+          q: 'Safe ba ang buyer data ko?',
+          a: 'Yes. Naka-store ang lahat ng data sa iyong sariling account lang. Hindi namin ibinabahagi ang data mo sa kahit sino. Ginagamit namin ang Supabase para sa secure na storage.',
+        },
+        {
+          q: 'Pwede ba sa Lazada at TikTok Shop?',
+          a: 'Oo! Kahit saang platform ka mag-export ng CSV orders, pwede mo i-import sa FollowShop. Works sa Shopee, Lazada, TikTok Shop, at iba pa.',
+        },
+        {
+          q: 'Paano kung mag-cancel ako?',
+          a: 'Cancel anytime — walang lock-in. Mag-go ka lang sa Settings → Billing at i-cancel mo ang subscription. Hindi ka machi-charge after ng cancellation.',
+        },
+        {
+          q: 'May free plan ba talaga?',
+          a: 'Oo! Ang free plan ay forever free — 1 rule, 3 templates, 30 orders per month. Perfect para masubukan ang app bago mag-upgrade.',
+        },
+      ].map((item, i) => (
+        <FAQItem key={i} q={item.q} a={item.a} />
+      ))}
+    </div>
+  </div>
+</section>
       {/* CTA */}
       <section className="cta-section">
         <div className="section-tag" style={{justifyContent:'center'}}>🚀 Get Started</div>
@@ -513,4 +602,49 @@ export default function Home() {
       </footer>
     </>
   )
+function FAQItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1.5px solid var(--border)',
+        borderRadius: 12,
+        overflow: 'hidden',
+        transition: 'border-color .2s',
+        ...(open ? {borderColor:'var(--orange-border)'} : {}),
+      }}
+    >
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', padding: '16px 20px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          textAlign: 'left', gap: 12,
+        }}
+      >
+        <span style={{fontSize:15,fontWeight:700,color:'var(--text)'}}>{q}</span>
+        <span style={{
+          width:24,height:24,borderRadius:6,
+          background: open ? 'var(--orange)' : 'var(--bg3)',
+          display:'flex',alignItems:'center',justifyContent:'center',
+          flexShrink:0,transition:'background .2s',
+        }}>
+          <svg width="12" height="12" fill="none" stroke={open?'#fff':'var(--muted)'} strokeWidth="2.5" viewBox="0 0 24 24">
+            {open
+              ? <polyline points="18 15 12 9 6 15"/>
+              : <polyline points="6 9 12 15 18 9"/>
+            }
+          </svg>
+        </span>
+      </button>
+      {open && (
+        <div style={{padding:'0 20px 16px',fontSize:14,color:'var(--sub)',lineHeight:1.7}}>
+          {a}
+        </div>
+      )}
+    </div>
+  )
+}
 }
