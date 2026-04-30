@@ -36,7 +36,7 @@ export default function LoginPage() {
     setResetLoading(true)
     setError('')
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://followshop.netlify.app/reset-password',
+      redirectTo: 'https://followshopapp.com/reset-password',
     })
     setResetLoading(false)
     if (error) {

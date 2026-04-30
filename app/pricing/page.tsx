@@ -140,6 +140,8 @@ export default function PricingPage() {
           currency,
           userId: user.id,
           userEmail: user.email,
+
+
         }),
       })
 

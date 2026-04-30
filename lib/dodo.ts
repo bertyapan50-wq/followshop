@@ -45,7 +45,7 @@ export async function createDodoCheckout({
     payment_link: true,
     product_id: productId,
     quantity: 1,
-    return_url: 'https://followshop.netlify.app/dashboard?payment=success',
+    return_url: 'https://followshopapp.com/dashboard?payment=success',
   })
 
   return session
