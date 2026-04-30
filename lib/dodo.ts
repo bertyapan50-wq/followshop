@@ -1,16 +1,15 @@
 import DodoPayments from 'dodopayments'
 
 const dodo = new DodoPayments({
-  bearerToken: process.env.DODO_TEST_API_KEY!,
-  environment: 'test_mode',
+  bearerToken: process.env.DODO_API_KEY!,
+  environment: 'live_mode',
 })
 
-
 export const DODO_PLAN_IDS = {
-  starter_monthly: process.env.DODO_TEST_STARTER_MONTHLY_ID!,
-  starter_annual:  process.env.DODO_TEST_STARTER_ANNUAL_ID!,
-  pro_monthly:     process.env.DODO_TEST_PRO_MONTHLY_ID!,
-  pro_annual:      process.env.DODO_TEST_PRO_ANNUAL_ID!,
+  starter_monthly: process.env.DODO_STARTER_MONTHLY_ID!,
+  starter_annual:  process.env.DODO_STARTER_ANNUAL_ID!,
+  pro_monthly:     process.env.DODO_PRO_MONTHLY_ID!,
+  pro_annual:      process.env.DODO_PRO_ANNUAL_ID!,
 }
 
 export async function createDodoCheckout({

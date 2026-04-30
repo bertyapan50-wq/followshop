@@ -442,7 +442,7 @@ export default function Home() {
 
             {/* STARTER */}
             <div className="price-card featured">
-              <div className="price-popular">Most Popular</div>
+              <div className="price-popular">Most Popular</div>c
               <div className="price-plan">Starter</div>
               <div className="price-amount">{getPrice('starter')}</div>
               <div className="price-period">/ month</div>

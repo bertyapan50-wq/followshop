@@ -290,6 +290,18 @@ if (!/[0-9]/.test(password)) {
             )}
 
             <div className="auth-field">
+  <label className="auth-label">Email</label>
+  <input
+    className="auth-input"
+    type="email"
+    value={email}
+    onChange={e => setEmail(e.target.value)}
+    onKeyDown={handleKeyDown}
+    placeholder="you@example.com"
+  />
+</div>
+
+<div className="auth-field">
   <label className="auth-label">Password</label>
   <input
     className="auth-input"

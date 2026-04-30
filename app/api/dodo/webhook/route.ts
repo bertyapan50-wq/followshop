@@ -1,21 +1,48 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import crypto from "crypto"
+import type { Plan, SubscriptionStatus } from "@/types"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function mapStatus(dodoStatus: string): SubscriptionStatus {
+  const statusMap: Record<string, SubscriptionStatus> = {
+    active:    "active",
+    on_trial:  "on_trial",
+    paused:    "paused",
+    past_due:  "past_due",
+    unpaid:    "unpaid",
+    cancelled: "cancelled",
+    expired:   "expired",
+    failed:    "expired",
+  }
+  return statusMap[dodoStatus] ?? "expired"
+}
+
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.text()
-    const event = JSON.parse(payload)
-    const eventType = event.type
-    const data = event.data
-    const userId = data?.metadata?.user_id
-    const plan = data?.metadata?.plan ?? "free"
 
-    console.log("Webhook received:", eventType, userId, plan)
+    // Signature verification
+    const webhookSecret = process.env.DODO_WEBHOOK_SECRET!
+    const signature = req.headers.get("webhook-signature") ?? ""
+    const expectedSig = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(payload)
+      .digest("hex")
+
+    if (signature !== expectedSig) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
+    }
+
+    const event = JSON.parse(payload)
+    const eventType: string = event.type
+    const data = event.data
+    const userId: string = data?.metadata?.user_id
+    const plan: Plan = data?.metadata?.plan ?? "free"
 
     if (!userId) {
       return NextResponse.json({ error: "No user_id" }, { status: 400 })
@@ -24,20 +51,26 @@ export async function POST(req: NextRequest) {
     if (
       eventType === "subscription.active" ||
       eventType === "subscription.created" ||
-      eventType === "subscription.updated"
+      eventType === "subscription.updated" ||
+      eventType === "subscription.resumed"
     ) {
       const { error } = await supabaseAdmin
         .from("subscriptions")
-        .upsert({
-          user_id: userId,
-          plan: plan,
-          status: data.status === "active" ? "active" : "on_trial",
-          dodo_id: data.subscription_id,
-          dodo_customer_id: data.customer?.customer_id,
-          product_id: data.product_id,
-          renews_at: data.next_billing_date ?? null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" })
+        .upsert(
+          {
+            user_id:          userId,
+            plan:             plan,
+            status:           mapStatus(data.status),
+            dodo_id:          data.subscription_id,
+            dodo_customer_id: data.customer?.customer_id,
+            product_id:       data.product_id,
+            renews_at:        data.next_billing_date ?? null,
+            ends_at:          data.ends_at ?? null,
+            trial_ends_at:    data.trial_ends_at ?? null,
+            updated_at:       new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        )
 
       if (error) {
         console.error("Supabase error:", error.message)
@@ -46,6 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true })
+
   } catch (err) {
     const e = err as Error
     console.error("Webhook error:", e.message)
