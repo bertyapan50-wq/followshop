@@ -135,11 +135,26 @@ export default function MessagesPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '32px', maxWidth: 1000, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+    <div className="messages-wrap" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .messages-wrap { padding: 20px 16px !important; }
+          .messages-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .messages-filters { flex-direction: column !important; align-items: stretch !important; }
+          .messages-search { flex: unset !important; width: 100% !important; }
+          .messages-pills { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; width: 100%; }
+          .messages-pills::-webkit-scrollbar { display: none; }
+          .messages-row { flex-wrap: wrap !important; }
+          .messages-actions { width: 100%; justify-content: flex-end !important; margin-top: 6px; }
+        }
+        @media (max-width: 480px) {
+          .messages-wrap { padding: 16px 12px !important; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div className="messages-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Messages</h1>
           <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
@@ -153,9 +168,9 @@ export default function MessagesPage() {
       {error && <Toast msg={error} type="error" />}
 
       {/* ── Filters ── */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="messages-filters" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Search */}
-        <div style={{ position: 'relative', flex: '1 1 220px' }}>
+        <div className="messages-search" style={{ position: 'relative', flex: '1 1 220px' }}>
           <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
             width="15" height="15" fill="none" stroke="#9CA3AF" strokeWidth="2" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -170,7 +185,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Status pills */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="messages-pills" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['all', 'pending', 'sent', 'failed'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)} style={{
               padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer',
@@ -217,7 +232,7 @@ export default function MessagesPage() {
                 transition: 'box-shadow .15s',
               }}>
                 {/* Row */}
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div className="messages-row" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
 
                   {/* Status dot */}
                   <div style={{
@@ -263,7 +278,7 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                  <div className="messages-actions" style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                     {/* Expand/collapse */}
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : msg.id)}
