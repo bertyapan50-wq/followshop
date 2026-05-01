@@ -104,11 +104,25 @@ export default function BillingPage() {
   const isPHP = currency === 'PHP'
 
   return (
-    <div style={{ padding: '32px', maxWidth: 760, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+    <div className="billing-wrap" style={{ padding: '32px', maxWidth: 760, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .billing-wrap { padding: 20px 16px !important; }
+          .billing-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .billing-current-card { flex-direction: column !important; align-items: flex-start !important; }
+          .billing-current-right { text-align: left !important; }
+          .upgrade-card-inner { flex-direction: column !important; }
+          .upgrade-card-right { align-items: flex-start !important; width: 100% !important; }
+          .upgrade-card-right button { width: 100% !important; }
+        }
+        @media (max-width: 480px) {
+          .billing-wrap { padding: 16px 12px !important; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+       <div className="billing-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111', margin: 0 }}>Billing</h1>
           <p style={{ fontSize: 14, color: '#9CA3AF', margin: '4px 0 0' }}>
@@ -157,7 +171,7 @@ export default function BillingPage() {
         padding: '20px 24px', marginBottom: 20,
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div className="billing-current-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>
               Current Plan
@@ -318,7 +332,7 @@ function UpgradeCard({ plan, currency, upgrading, featured, onUpgrade }: Upgrade
       borderRadius: 14, padding: '20px 24px',
       boxShadow: featured ? '0 4px 20px rgba(238,77,45,0.08)' : '0 2px 6px rgba(0,0,0,0.03)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+      <div className="upgrade-card-inner" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
 
         {/* Left: plan info */}
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -342,7 +356,7 @@ function UpgradeCard({ plan, currency, upgrading, featured, onUpgrade }: Upgrade
         </div>
 
         {/* Right: price + billing toggle + CTA */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+        <div className="upgrade-card-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
 
           {/* Billing cycle toggle */}
           <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: 8, padding: 3, gap: 3 }}>
