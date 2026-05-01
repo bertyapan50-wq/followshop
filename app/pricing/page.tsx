@@ -164,8 +164,21 @@ export default function PricingPage() {
       maxWidth: 980,
       margin: '0 auto',
       fontFamily: "'DM Sans', sans-serif",
+      width: '100%',
+      boxSizing: 'border-box',
+      overflowX: 'hidden',
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .pricing-grid { grid-template-columns: 1fr !important; }
+          .pricing-controls { flex-direction: column !important; align-items: center !important; gap: 14px !important; }
+          .pricing-divider { display: none !important; }
+        }
+        @media (max-width: 480px) {
+          .pricing-wrap { padding: 32px 16px !important; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
       <div style={{ textAlign: 'center', marginBottom: 36 }}>
@@ -181,7 +194,7 @@ export default function PricingPage() {
       </div>
 
       {/* ── Controls: Billing toggle + Currency switcher ── */}
-      <div style={{
+      <div className="pricing-controls" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 20, marginBottom: 36, flexWrap: 'wrap',
       }}>
@@ -221,7 +234,7 @@ export default function PricingPage() {
         </div>
 
         {/* Divider */}
-        <div style={{ width: 1, height: 24, background: '#E5E7EB' }} />
+        <div className="pricing-divider" style={{ width: 1, height: 24, background: '#E5E7EB' }} />
 
         {/* Currency switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -267,7 +280,7 @@ export default function PricingPage() {
       )}
 
       {/* ── Pricing cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {PLANS.map(plan => {
           const isLoadingThis = loading === plan.key
           const billedNote = getBilledNote(plan.key)
