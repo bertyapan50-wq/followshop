@@ -23,7 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { count: pendingMsgs }, { data: sub },
         { count: rulesCount }, { count: templatesCount }, { count: ordersCount },
       ] = await Promise.all([
-        supabase.from('message_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('message_queue')
+  .select('*', { count: 'exact', head: true })
+  .eq('status', 'pending')
+  .eq('user_id', uid),
         supabase.from('subscriptions').select('plan').eq('user_id', uid).single(),
         supabase.from('rules').select('*', { count: 'exact', head: true }).eq('user_id', uid).eq('is_active', true),
         supabase.from('templates').select('*', { count: 'exact', head: true }).eq('user_id', uid),
