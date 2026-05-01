@@ -66,6 +66,7 @@ export default function LoginPage() {
           justify-content: center;
           background: #F7F7F7;
           padding: 24px;
+          overflow-x: hidden;
         }
         .auth-card {
           display: grid;
