@@ -47,8 +47,16 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: 600, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+   <div className="settings-wrap" style={{ padding: '32px', maxWidth: 600, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .settings-wrap { padding: 20px 16px !important; }
+        }
+        @media (max-width: 480px) {
+          .settings-wrap { padding: 16px 12px !important; }
+        }
+      `}</style>
 
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Settings</h1>
