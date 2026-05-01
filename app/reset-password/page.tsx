@@ -80,13 +80,14 @@ export default function ResetPasswordPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Sans', sans-serif; }
 
-        .auth-wrapper {
+         .auth-wrapper {
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
           background: #F7F7F7;
           padding: 24px;
+          overflow-x: hidden;
         }
         .auth-card {
           display: grid;
