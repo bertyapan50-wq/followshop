@@ -214,11 +214,26 @@ export default function RulesPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '32px', maxWidth: 900, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+    <div className="rules-page-wrap" style={{ padding: '32px', maxWidth: 900, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .rules-page-wrap { padding: 20px 16px !important; }
+          .rules-header { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
+          .rules-header-btn { width: 100% !important; justify-content: center !important; }
+          .rules-flow { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+          .rules-flow-arrow { transform: rotate(90deg); }
+          .rules-list-item { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+          .rules-list-actions { width: 100%; display: flex !important; justify-content: flex-end !important; gap: 8px !important; }
+          .rules-trigger-group { flex-direction: column !important; }
+        }
+        @media (max-width: 480px) {
+          .rules-page-wrap { padding: 16px 12px !important; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div className="rules-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Rules</h1>
           <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
@@ -231,6 +246,7 @@ export default function RulesPage() {
           </p>
         </div>
         <button
+          className="rules-header-btn"
           onClick={handleNewRuleClick}
           style={{
             display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
@@ -321,14 +337,14 @@ export default function RulesPage() {
 
           <form onSubmit={handleSubmit}>
             {/* Flow diagram */}
-            <div style={{
+            <div className="rules-flow" style={{
               display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24,
               padding: '14px 18px', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0',
             }}>
               <FlowStep icon="⚡" label="Trigger" value={form.trigger ? TRIGGER_MAP[form.trigger]?.label : 'Not selected'} active={!!form.trigger} />
-              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              <svg className="rules-flow-arrow" width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               <FlowStep icon="✉️" label="Send Template" value={selectedTemplate ? selectedTemplate.name : 'Not selected'} active={!!form.message_template} />
-              <svg width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              <svg className="rules-flow-arrow" width="24" height="24" fill="none" stroke="#D1D5DB" strokeWidth="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               <FlowStep icon="📬" label="Message Queued" value="Auto-scheduled" active={!!(form.trigger && form.message_template)} />
             </div>
 
@@ -448,7 +464,7 @@ export default function RulesPage() {
                 boxShadow: rule.is_active ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
                 opacity: rule.is_active ? 1 : 0.65, transition: 'all .2s',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <div className="rules-list-item" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#FFF7ED', border: '1px solid #FED7AA', padding: '6px 12px', borderRadius: 20, flexShrink: 0 }}>
                     <span style={{ fontSize: 14 }}>{triggerInfo?.icon || '⚡'}</span>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#C2410C' }}>{triggerInfo?.label || rule.trigger}</span>
@@ -465,6 +481,7 @@ export default function RulesPage() {
                       {rule.is_active ? 'Active' : !canToggleOn ? 'Limit reached' : 'Inactive'}
                     </span>
                   </div>
+                  <div className="rules-list-actions" style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => handleEdit(rule)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: '1.5px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer' }}>Edit</button>
                   <button onClick={() => handleDelete(rule.id)}
                     style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #E5E7EB', background: '#fff', color: '#D1D5DB', cursor: 'pointer', transition: 'color .15s' }}
@@ -477,6 +494,7 @@ export default function RulesPage() {
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                     </svg>
                   </button>
+                  </div>
                 </div>
                 {triggerInfo && <p style={{ fontSize: 12, color: '#9CA3AF', margin: '10px 0 0', paddingLeft: 2 }}>{triggerInfo.desc}</p>}
               </div>
