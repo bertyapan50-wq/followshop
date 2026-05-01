@@ -101,7 +101,7 @@ export default function DashboardPage() {
   )
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ fontFamily: "'DM Sans',sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
         @keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:.6} }
