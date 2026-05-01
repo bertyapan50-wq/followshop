@@ -216,11 +216,25 @@ Return ONLY the message text, nothing else.`
   function insertVariable(tag: string) { setForm(f => ({ ...f, content: f.content + tag })) }
 
   return (
-    <div style={{ padding: '32px', maxWidth: 900, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+    <div className="templates-wrap" style={{ padding: '32px', maxWidth: 900, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+        @media (max-width: 768px) {
+          .templates-wrap { padding: 20px 16px !important; }
+          .templates-header { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
+          .templates-header-actions { width: 100% !important; flex-direction: column !important; }
+          .templates-header-actions > button { width: 100% !important; justify-content: center !important; }
+          .templates-ai-grid { grid-template-columns: 1fr !important; }
+          .templates-card-row { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .templates-card-actions { width: 100% !important; justify-content: flex-end !important; }
+        }
+        @media (max-width: 480px) {
+          .templates-wrap { padding: 16px 12px !important; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div className="templates-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Templates</h1>
           <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
@@ -232,8 +246,8 @@ Return ONLY the message text, nothing else.`
             )}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={handleAIClick} style={{
+        <div className="templates-header-actions" style={{ display: 'flex', gap: 10 }}>
+          <button onClick={handleAIClick}style={{
             display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
             background: isAtLimit ? '#F3F4F6' : showAI ? '#7C3AED' : '#EDE9FE',
             color: isAtLimit ? '#9CA3AF' : showAI ? '#fff' : '#7C3AED',
@@ -300,7 +314,7 @@ Return ONLY the message text, nothing else.`
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginBottom: 16 }}>
+          <div className="templates-ai-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginBottom: 16 }}>
             <div>
               <label style={{ ...labelStyle, color: '#5B21B6' }}>Trigger Type</label>
               <select value={aiTrigger} onChange={e => setAiTrigger(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
@@ -416,7 +430,7 @@ Return ONLY the message text, nothing else.`
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {templates.map(t => (
             <div key={t.id} style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px' }}>
+              <div className="templates-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="18" height="18" fill="none" stroke="#EE4D2D" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -426,7 +440,7 @@ Return ONLY the message text, nothing else.`
                     <p style={{ fontSize: 12, color: '#9CA3AF', margin: '2px 0 0' }}>{t.content.length} chars · {formatDate(t.created_at)}</p>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="templates-card-actions" style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setPreviewId(previewId === t.id ? null : t.id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: '1.5px solid #E5E7EB', background: previewId === t.id ? '#F3F4F6' : '#fff', color: '#374151', cursor: 'pointer' }}>{previewId === t.id ? 'Hide' : 'Preview'}</button>
                   <button onClick={() => handleEdit(t)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: '1.5px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer' }}>Edit</button>
                   <button onClick={() => handleDelete(t.id)} style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #E5E7EB', background: '#fff', color: '#D1D5DB', cursor: 'pointer' }}
