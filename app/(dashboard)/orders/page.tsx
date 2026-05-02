@@ -50,21 +50,117 @@ const DEFAULT_STATUS = { label: 'Unknown', bg: '#F9FAFB', color: '#6B7280', dot:
 function parseCSV(text: string): Omit<Order, 'id' | 'created_at'>[] {
   const lines = text.trim().split('\n')
   if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+
+  // Parse headers
+  const headers = lines[0].split('\t').map(h => h.trim().replace(/^"|"$/g, ''))
+
+  // Helper to find column index (case-insensitive)
+  const col = (name: string) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase())
+
+  // Detect if this is a Shopee export or generic CSV
+  const isShopee = col('Username (Buyer)') !== -1 || col('Order ID') !== -1
+
   const results: Omit<Order, 'id' | 'created_at'>[] = []
+
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''))
-    const row: Record<string, string> = {}
-    headers.forEach((h, idx) => { row[h] = values[idx] || '' })
-    results.push({
-      buyer_name: row.buyer_name || row['buyer name'] || '',
-      product: row.product || '',
-      order_date: row.order_date || row['order date'] || '',
-      delivery_date: row.delivery_date || row['delivery date'] || null,
-      status: row.status || 'pending',
-    })
+    const line = lines[i].trim()
+    if (!line) continue
+
+    // Handle both tab-separated (Shopee) and comma-separated (generic)
+    const values = isShopee
+      ? line.split('\t').map(v => v.trim().replace(/^"|"$/g, ''))
+      : parseCSVLine(line)
+
+    const get = (name: string) => {
+      const idx = col(name)
+      return idx !== -1 ? (values[idx] || '').trim() : ''
+    }
+
+    let buyer_name: string
+    let product: string
+    let order_date: string
+    let delivery_date: string | null
+    let status: string
+
+    if (isShopee) {
+      // ── Shopee format ──
+      buyer_name   = get('Receiver Name') || get('Username (Buyer)')
+      product      = get('Product Name')
+      order_date   = formatShopeeDate(get('Order Creation Date'))
+      delivery_date = get('Order Complete Time')
+        ? formatShopeeDate(get('Order Complete Time'))
+        : null
+      status       = mapShopeeStatus(get('Order Status'))
+    } else {
+      // ── Generic CSV format ──
+      const row: Record<string, string> = {}
+      headers.forEach((h, idx) => { row[h] = values[idx] || '' })
+      buyer_name    = row['buyer_name'] || row['buyer name'] || row['Buyer Name'] || ''
+      product       = row['product'] || row['Product'] || row['Product Name'] || ''
+      order_date    = row['order_date'] || row['order date'] || row['Order Date'] || ''
+      delivery_date = row['delivery_date'] || row['delivery date'] || null
+      status        = row['status'] || row['Status'] || 'pending'
+    }
+
+    if (!buyer_name || !product) continue
+
+    results.push({ buyer_name, product, order_date, delivery_date: delivery_date || null, status })
   }
-  return results.filter(r => r.buyer_name && r.product)
+
+  return results
+}
+
+// ── Parse a single CSV line (handles quoted fields with commas) ──
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
+// ── Convert Shopee date format to YYYY-MM-DD ──
+// Shopee format: "2024-01-15 14:30:00" or "15/01/2024 14:30"
+function formatShopeeDate(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0]
+    }
+    // Try DD/MM/YYYY format
+    const parts = dateStr.split(/[\/\s]/)
+    if (parts.length >= 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+    }
+  } catch { /* ignore */ }
+  return dateStr
+}
+
+// ── Map Shopee status to our status values ──
+function mapShopeeStatus(shopeeStatus: string): string {
+  const map: Record<string, string> = {
+    'READY_TO_SHIP': 'READY_TO_SHIP',
+    'SHIPPED':       'SHIPPED',
+    'COMPLETED':     'delivered',
+    'CANCELLED':     'cancelled',
+    'UNPAID':        'pending',
+    'TO_RETURN':     'returned',
+    'IN_CANCEL':     'cancelled',
+    'TO_CONFIRM_RECEIVE': 'SHIPPED',
+  }
+  return map[shopeeStatus] || shopeeStatus || 'pending'
 }
 
 export default function OrdersPage() {
@@ -445,7 +541,7 @@ export default function OrdersPage() {
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             Import CSV
-            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleFileChange} disabled={isAtLimit} />
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls"  style={{ display: 'none' }} onChange={handleFileChange} disabled={isAtLimit} />
           </label>
           <button
             onClick={() => { if (!checkLimit()) return; setShowForm(v => !v); setForm(EMPTY_FORM) }}
