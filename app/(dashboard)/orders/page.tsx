@@ -237,30 +237,50 @@ export default function OrdersPage() {
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setCsvFileName(file.name)
-    const reader = new FileReader()
+  const file = e.target.files?.[0]
+  if (!file) return
+  setCsvFileName(file.name)
+
+  const reader = new FileReader()
+
+  if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+    // ✅ Excel file
+    reader.onload = async ev => {
+      const XLSX = await import('xlsx')
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const text = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' })
+      processParsed(text)
+    }
+    reader.readAsArrayBuffer(file)
+  } else {
+    // ✅ CSV file
     reader.onload = ev => {
       const text = ev.target?.result as string
-      const parsed = parseCSV(text)
-      if (!parsed.length) return notify('No valid rows found in CSV.', 'error')
-      if (plan !== 'pro' && orders.length + parsed.length > orderLimit) {
-        const canAdd = orderLimit - orders.length
-        notify(
-          canAdd <= 0
-            ? `You've reached the ${orderLimit} order limit. Upgrade to import more.`
-            : `CSV has ${parsed.length} rows but you can only add ${canAdd} more (limit: ${orderLimit}). Upgrade or reduce CSV rows.`,
-          'error'
-        )
-        setCsvFileName('')
-        if (fileRef.current) fileRef.current.value = ''
-        return
-      }
-      setCsvPreview(parsed)
+      processParsed(text)
     }
     reader.readAsText(file)
   }
+}
+
+function processParsed(text: string) {
+  const parsed = parseCSV(text)
+  if (!parsed.length) return notify('No valid rows found. Check your file format.', 'error')
+  if (plan !== 'pro' && orders.length + parsed.length > orderLimit) {
+    const canAdd = orderLimit - orders.length
+    notify(
+      canAdd <= 0
+        ? `You've reached the ${orderLimit} order limit. Upgrade to import more.`
+        : `File has ${parsed.length} rows but you can only add ${canAdd} more (limit: ${orderLimit}).`,
+      'error'
+    )
+    setCsvFileName('')
+    if (fileRef.current) fileRef.current.value = ''
+    return
+  }
+  setCsvPreview(parsed)
+}
 
   async function handleCsvImport() {
     if (!csvPreview?.length || !userId) return
