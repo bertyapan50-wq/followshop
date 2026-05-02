@@ -1,15 +1,14 @@
 'use client'
 
-
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const planFromUrl = searchParams.get('plan') // e.g. ?plan=starter
+  const planFromUrl = searchParams.get('plan')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,7 +20,6 @@ export default function SignupPage() {
   const handleSignup = async () => {
     setError('')
 
-    // Client-side validation
     if (!email.trim()) return setError('Email is required.')
     if (password.length < 6) return setError('Password must be at least 6 characters.')
     if (password !== confirmPassword) return setError('Passwords do not match.')
@@ -32,7 +30,6 @@ export default function SignupPage() {
       email: email.trim(),
       password,
       options: {
-        // Pass plan in metadata so we can pick it up after onboarding
         data: { plan: planFromUrl || 'free' },
       },
     })
@@ -43,7 +40,6 @@ export default function SignupPage() {
       return
     }
 
-    // ✅ Redirect to onboarding instead of dashboard
     router.push('/onboarding')
   }
 
@@ -126,7 +122,6 @@ export default function SignupPage() {
             Free to start · 7-day trial on paid plans
           </p>
 
-          {/* Plan badge if coming from pricing */}
           {planFromUrl && (
             <div style={{
               background: '#FFF1EE', border: '1px solid #FECACA',
@@ -141,7 +136,6 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* Error */}
           {error && (
             <div style={{
               background: '#FEF2F2', border: '1px solid #FECACA',
@@ -152,7 +146,6 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* Email */}
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
               Email
@@ -169,7 +162,6 @@ export default function SignupPage() {
             />
           </div>
 
-          {/* Password */}
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
               Password
@@ -200,7 +192,6 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Confirm password */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
               Confirm Password
@@ -232,13 +223,11 @@ export default function SignupPage() {
             {loading ? 'Creating account…' : 'Create Account →'}
           </button>
 
-          {/* Trial note */}
           <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', margin: '12px 0 0', lineHeight: 1.5 }}>
             ✅ No credit card required · Cancel anytime
           </p>
         </div>
 
-        {/* Login link */}
         <p style={{ textAlign: 'center', fontSize: 13, color: '#9CA3AF', marginTop: 20 }}>
           May account na?{' '}
           <Link href="/login" style={{ color: '#EE4D2D', fontWeight: 600, textDecoration: 'none' }}>
@@ -247,5 +236,14 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+// ✅ Suspense wrapper — fixes useSearchParams() prerender error
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   )
 }
