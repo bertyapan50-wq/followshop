@@ -364,7 +364,7 @@ export default function MessagesPage() {
 
                     {/* Open Shopee chat */}
                     <a
-                      href="https://seller.shopee.ph/portal/chat"
+                      href="https://seller.shopee.ph/portal/sale/order"
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
