@@ -60,6 +60,17 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ── Fetch shop_name from profiles ─────────────────────────────────────────────
+async function getShopName(user_id: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('shop_name')
+    .eq('id', user_id)
+    .single()
+
+  return data?.shop_name || ''
+}
+
 // ── Process a single rule ─────────────────────────────────────────────────────
 async function processRule(rule: {
   id: string
@@ -68,8 +79,11 @@ async function processRule(rule: {
   message_template: string
 }): Promise<number> {
 
+  // ✅ Fetch shop_name once per rule
+  const shopName = await getShopName(rule.user_id)
+
   if (rule.trigger === 'repeat_buyer') {
-    return processRepeatBuyer(rule)
+    return processRepeatBuyer(rule, shopName)
   }
 
   const config = TRIGGER_CONFIG[rule.trigger]
@@ -83,7 +97,6 @@ async function processRule(rule: {
   const targetDate = new Date(now)
   targetDate.setDate(targetDate.getDate() - config.days)
 
-  // delivery_date at order_date ay date type sa Supabase — YYYY-MM-DD lang
   const dateStr = targetDate.toISOString().split('T')[0]
 
   // ── Fetch matching orders ─────────────────────────────────────────────────
@@ -132,7 +145,7 @@ async function processRule(rule: {
     order_id:     order.id,
     buyer_name:   order.buyer_name,
     trigger:      rule.trigger,
-    message:      fillTemplate(template.content, order),
+    message:      fillTemplate(template.content, order, shopName), // ✅
     status:       'pending',
     scheduled_at: new Date().toISOString(),
   }))
@@ -153,7 +166,7 @@ async function processRepeatBuyer(rule: {
   user_id: string
   trigger: string
   message_template: string
-}): Promise<number> {
+}, shopName: string): Promise<number> { // ✅ tanggap na ang shopName
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -206,7 +219,7 @@ async function processRepeatBuyer(rule: {
     order_id:     order.id,
     buyer_name:   order.buyer_name,
     trigger:      'repeat_buyer',
-    message:      fillTemplate(template.content, order),
+    message:      fillTemplate(template.content, order, shopName), // ✅
     status:       'pending',
     scheduled_at: new Date().toISOString(),
   }))
@@ -223,7 +236,7 @@ function fillTemplate(content: string, order: {
   product: string
   order_date: string
   delivery_date?: string
-}): string {
+}, shopName: string): string { // ✅ may shopName na parameter
   return content
     .replace(/{{buyer_name}}/g, order.buyer_name)
     .replace(/{{product}}/g, order.product)
@@ -236,5 +249,5 @@ function fillTemplate(content: string, order: {
         })
       : ''
     )
-    .replace(/{{shop_name}}/g, '')
+    .replace(/{{shop_name}}/g, shopName) // ✅ gumagana na!
 }
