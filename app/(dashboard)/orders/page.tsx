@@ -236,7 +236,7 @@ export default function OrdersPage() {
     fetchOrders()
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+ function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
   if (!file) return
   setCsvFileName(file.name)
@@ -244,23 +244,16 @@ export default function OrdersPage() {
   const reader = new FileReader()
 
   if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-    // ✅ Excel file
     reader.onload = async ev => {
       const XLSX = await import('xlsx')
       const data = new Uint8Array(ev.target?.result as ArrayBuffer)
       const workbook = XLSX.read(data, { type: 'array', cellDates: true })
-      console.log('=== SHEET NAMES ===', workbook.SheetNames)
-      console.log('=== SHEET COUNT ===', workbook.SheetNames.length)
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      console.log('=== SHEET REF ===', sheet['!ref'])
       const text = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' })
-      console.log('=== RAW TEXT LENGTH ===', text.length)
-      console.log('=== RAW TEXT FIRST 500 ===', text.substring(0, 500))
       processParsed(text)
     }
     reader.readAsArrayBuffer(file)
   } else {
-    // ✅ CSV file
     reader.onload = ev => {
       const text = ev.target?.result as string
       processParsed(text)
@@ -270,14 +263,7 @@ export default function OrdersPage() {
 }
 
 function processParsed(text: string) {
-  const lines = text.trim().split(/\r\n|\r|\n/)
-  console.log('=== HEADERS ===', lines[0])
-  console.log('=== ROW 1 ===', lines[1])
-  console.log('=== TOTAL LINES ===', lines.length)
-
   const parsed = parseCSV(text)
-  console.log('=== PARSED RESULT ===', parsed)
-
   if (!parsed.length) return notify('No valid rows found. Check your file format.', 'error')
   if (plan !== 'pro' && orders.length + parsed.length > orderLimit) {
     const canAdd = orderLimit - orders.length
