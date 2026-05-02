@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-function SignupForm() {
+export default function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const planFromUrl = searchParams.get('plan') // e.g. ?plan=starter
@@ -246,14 +247,5 @@ function SignupForm() {
         </p>
       </div>
     </div>
-  )
-}
-
-// ✅ Suspense wrapper — fixes useSearchParams() prerender error
-export default function SignupPage() {
-  return (
-    <Suspense fallback={null}>
-      <SignupForm />
-    </Suspense>
   )
 }
