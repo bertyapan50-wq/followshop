@@ -265,7 +265,14 @@ export default function OrdersPage() {
 }
 
 function processParsed(text: string) {
+  const lines = text.trim().split('\n')
+  console.log('=== HEADERS ===', lines[0])
+  console.log('=== ROW 1 ===', lines[1])
+  console.log('=== TOTAL LINES ===', lines.length)
+
   const parsed = parseCSV(text)
+  console.log('=== PARSED RESULT ===', parsed)
+
   if (!parsed.length) return notify('No valid rows found. Check your file format.', 'error')
   if (plan !== 'pro' && orders.length + parsed.length > orderLimit) {
     const canAdd = orderLimit - orders.length
