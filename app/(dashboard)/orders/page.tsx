@@ -265,7 +265,7 @@ export default function OrdersPage() {
 }
 
 function processParsed(text: string) {
-  const lines = text.trim().split('\n')
+  const lines = text.trim().split(/\r\n|\r|\n/)
   console.log('=== HEADERS ===', lines[0])
   console.log('=== ROW 1 ===', lines[1])
   console.log('=== TOTAL LINES ===', lines.length)
