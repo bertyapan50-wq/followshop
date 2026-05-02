@@ -58,11 +58,7 @@ export default function OnboardingPage() {
     })
   }, [])
 
-  // ── Update template preview when shop name changes ──────────────────────────
-  useEffect(() => {
-    const name = shopName.trim() || 'My Shop'
-    setTemplateContent(DEFAULT_TEMPLATE.content.replace('{{shop_name}}', `{{shop_name}}`))
-  }, [shopName])
+  
 
   // ── Live preview ────────────────────────────────────────────────────────────
   const preview = templateContent
