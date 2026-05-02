@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -33,6 +34,11 @@ const TRIGGER_LABELS: Record<string, string> = {
 const FREE_LIMITS = { rules: 1, templates: 3, orders: 30 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams()
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
+
+  const showWelcome =
+    searchParams.get('welcome') === '1' && !welcomeDismissed
   const [stats, setStats] = useState<Stats>({
     totalOrders: 0, delivered: 0, pending: 0,
     totalTemplates: 0, activeRules: 0, queuedMessages: 0,
@@ -44,6 +50,7 @@ export default function DashboardPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [plan, setPlan] = useState<Plan>('free')
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  
 
   async function fetchDashboard() {
     setLoading(true)
@@ -155,8 +162,18 @@ export default function DashboardPage() {
       `}</style>
 
       <div className="dash-page">
+{showWelcome && (
+  <WelcomeBanner
+    onDismiss={() => {
+      setWelcomeDismissed(true)
+      window.history.replaceState({}, '', '/dashboard')
+    }}
+  />
+)}
 
-        {/* ── Header ── */}
+{
+
+        /* ── Header ── */}
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111', margin: 0 }}>Dashboard</h1>
           <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0' }}>
@@ -411,4 +428,78 @@ function StatusDot({ status }: { status: string }) {
 function formatDate(dateStr: string): string {
   try { return new Date(dateStr).toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' }) }
   catch { return dateStr }
+}
+function WelcomeBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #FFF1EE 0%, #FFF8F6 100%)',
+      border: '1.5px solid rgba(238,77,45,0.25)',
+      borderRadius: 14, padding: '18px 20px', marginBottom: 20,
+      position: 'relative',
+      animation: 'slideDown .35s ease',
+    }}>
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      <button
+        onClick={onDismiss}
+        style={{
+          position: 'absolute', top: 10, right: 12,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: '#9CA3AF', fontSize: 20, lineHeight: 1,
+          padding: 4, minWidth: 28, minHeight: 28,
+        }}
+      >
+        ×
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: '#EE4D2D', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          fontSize: 22, flexShrink: 0,
+        }}>
+          🎉
+        </div>
+        <div>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#C2410C', margin: '0 0 4px' }}>
+            Account mo ay handa na!
+          </p>
+          <p style={{ fontSize: 13, color: '#92400E', margin: '0 0 12px', lineHeight: 1.6 }}>
+            Na-setup na ang iyong first template at rule. Ang susunod na step —
+            mag-import ng orders para magsimula ang automation.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a
+              href="/orders"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '7px 14px', borderRadius: 8,
+                background: '#EE4D2D', color: '#fff',
+                fontSize: 13, fontWeight: 700, textDecoration: 'none',
+              }}
+            >
+              📦 Import Orders
+            </a>
+            <a
+              href="/templates"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '7px 14px', borderRadius: 8,
+                border: '1.5px solid #FECACA', background: '#fff',
+                color: '#C2410C', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              }}
+            >
+              ✉️ View Template
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
