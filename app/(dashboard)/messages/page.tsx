@@ -39,14 +39,12 @@ const STATUS_CONFIG: Record<MessageStatus, { label: string; bg: string; color: s
 export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('pending')
   const [searchQuery, setSearchQuery] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  // ── Fetch ─────────────────────────────────────────────────────────────────
 
   async function fetchMessages() {
     setLoading(true)
@@ -61,15 +59,40 @@ export default function MessagesPage() {
 
   useEffect(() => { fetchMessages() }, [])
 
-  // ── Notify ────────────────────────────────────────────────────────────────
-
   function notify(msg: string, type: 'success' | 'error') {
     if (type === 'success') { setSuccess(msg); setTimeout(() => setSuccess(null), 3500) }
     else { setError(msg); setTimeout(() => setError(null), 4000) }
   }
 
-  // ── Mark as sent ──────────────────────────────────────────────────────────
+  // ── Copy & Mark as Sent in 1 click ───────────────────────────────────────
+  async function copyAndMarkSent(msg: Message) {
+    // 1. Copy to clipboard
+    await navigator.clipboard.writeText(msg.message)
+    setCopiedId(msg.id)
+    setTimeout(() => setCopiedId(null), 2000)
 
+    // 2. Mark as sent
+    setMarkingId(msg.id)
+    const { error } = await supabase
+      .from('message_queue')
+      .update({ status: 'sent' })
+      .eq('id', msg.id)
+    setMarkingId(null)
+    if (error) return notify(error.message, 'error')
+
+    notify('✅ Copied! I-paste na sa Shopee chat.', 'success')
+    fetchMessages()
+  }
+
+  // ── Copy only ─────────────────────────────────────────────────────────────
+  async function copyMessage(msg: Message) {
+    await navigator.clipboard.writeText(msg.message)
+    setCopiedId(msg.id)
+    setTimeout(() => setCopiedId(null), 2000)
+    notify('Copied to clipboard!', 'success')
+  }
+
+  // ── Mark as sent ──────────────────────────────────────────────────────────
   async function markAsSent(id: string) {
     setMarkingId(id)
     const { error } = await supabase
@@ -83,7 +106,6 @@ export default function MessagesPage() {
   }
 
   // ── Mark as failed ────────────────────────────────────────────────────────
-
   async function markAsFailed(id: string) {
     setMarkingId(id)
     const { error } = await supabase
@@ -97,7 +119,6 @@ export default function MessagesPage() {
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
-
   async function handleDelete(id: string) {
     if (!confirm('Delete this message from the queue?')) return
     const { error } = await supabase.from('message_queue').delete().eq('id', id)
@@ -106,15 +127,7 @@ export default function MessagesPage() {
     fetchMessages()
   }
 
-  // ── Copy message ──────────────────────────────────────────────────────────
-
-  function copyMessage(text: string) {
-    navigator.clipboard.writeText(text)
-    notify('Message copied to clipboard!', 'success')
-  }
-
   // ── Filtered ──────────────────────────────────────────────────────────────
-
   const filtered = messages.filter(m => {
     const matchSearch =
       m.buyer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,8 +135,6 @@ export default function MessagesPage() {
     const matchStatus = statusFilter === 'all' || m.status === statusFilter
     return matchSearch && matchStatus
   })
-
-  // ── Counts ────────────────────────────────────────────────────────────────
 
   const counts = {
     all:     messages.length,
@@ -133,44 +144,87 @@ export default function MessagesPage() {
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
-    <div className="messages-wrap" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
-        @media (max-width: 768px) {
-          .messages-wrap { padding: 20px 16px !important; }
-          .messages-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
-          .messages-filters { flex-direction: column !important; align-items: stretch !important; }
-          .messages-search { flex: unset !important; width: 100% !important; }
-          .messages-pills { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; width: 100%; }
-          .messages-pills::-webkit-scrollbar { display: none; }
-          .messages-row { flex-wrap: wrap !important; }
-          .messages-actions { width: 100%; justify-content: flex-end !important; margin-top: 6px; }
+
+        .msg-card { transition: box-shadow .15s; }
+        .msg-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+
+        .copy-sent-btn {
+          display: flex; align-items: center; gap: 7px;
+          padding: 9px 16px; border-radius: 9px; border: none;
+          background: #EE4D2D; color: #fff;
+          font-size: 13px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+          transition: opacity .15s, transform .15s;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(238,77,45,0.25);
         }
-        @media (max-width: 480px) {
-          .messages-wrap { padding: 16px 12px !important; }
+        .copy-sent-btn:hover { opacity: .9; transform: translateY(-1px); }
+        .copy-sent-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+        .copy-sent-btn.copied { background: #16A34A; }
+
+        .copy-only-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 9px 14px; border-radius: 9px;
+          border: 1.5px solid #E5E7EB; background: #fff;
+          color: #374151; font-size: 13px; font-weight: 600;
+          cursor: pointer; font-family: inherit;
+          transition: all .15s;
+          white-space: nowrap;
+        }
+        .copy-only-btn:hover { border-color: #EE4D2D; color: #EE4D2D; }
+
+        .icon-btn {
+          padding: 8px; border-radius: 8px;
+          border: 1.5px solid #E5E7EB; background: #fff;
+          color: #D1D5DB; cursor: pointer;
+          transition: color .15s;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .icon-btn:hover { color: #EF4444; }
+
+        @media (max-width: 768px) {
+          .msg-actions { flex-wrap: wrap; }
+          .copy-sent-btn { flex: 1; justify-content: center; }
+        }
+        @media (max-width: 600px) {
+          .page-wrap { padding: 20px 16px !important; }
+          .msg-actions { width: 100%; margin-top: 10px; }
         }
       `}</style>
 
       {/* ── Header ── */}
-      <div className="messages-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: '#111', margin: 0 }}>Messages</h1>
-          <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
-            {messages.length} total · {counts.pending} pending · {counts.sent} sent
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111', margin: 0 }}>Messages</h1>
+        <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>
+          {counts.pending} pending · {counts.sent} sent · {counts.all} total
+        </p>
+      </div>
+
+      {/* ── How to use banner (only if may pending) ── */}
+      {counts.pending > 0 && (
+        <div style={{
+          background: '#FFF7ED', border: '1.5px solid #FED7AA',
+          borderRadius: 12, padding: '12px 16px', marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <p style={{ fontSize: 13, color: '#92400E', margin: 0, fontWeight: 500 }}>
+            I-click ang <strong>"📋 Copy & Mark Sent"</strong> → pumunta sa Shopee chat → i-paste (Ctrl+V) → Send!
           </p>
         </div>
-      </div>
+      )}
 
       {/* ── Toasts ── */}
       {success && <Toast msg={success} type="success" />}
       {error && <Toast msg={error} type="error" />}
 
       {/* ── Filters ── */}
-      <div className="messages-filters" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Search */}
-        <div className="messages-search" style={{ position: 'relative', flex: '1 1 220px' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 220px' }}>
           <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
             width="15" height="15" fill="none" stroke="#9CA3AF" strokeWidth="2" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -183,18 +237,16 @@ export default function MessagesPage() {
             style={{ ...inputStyle, paddingLeft: 36, width: '100%', boxSizing: 'border-box' }}
           />
         </div>
-
-        {/* Status pills */}
-        <div className="messages-pills" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['all', 'pending', 'sent', 'failed'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)} style={{
               padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer',
               border: statusFilter === s ? 'none' : '1.5px solid #E5E7EB',
               background: statusFilter === s ? '#EE4D2D' : '#fff',
               color: statusFilter === s ? '#fff' : '#6B7280',
-              transition: 'all .15s',
+              transition: 'all .15s', whiteSpace: 'nowrap',
             }}>
-              {s === 'all' ? `All (${counts.all})` : `${STATUS_CONFIG[s].label} (${counts[s]})`}
+              {s === 'all' ? `All (${counts.all})` : `${STATUS_CONFIG[s as MessageStatus]?.label} (${counts[s]})`}
             </button>
           ))}
         </div>
@@ -202,9 +254,7 @@ export default function MessagesPage() {
 
       {/* ── Messages List ── */}
       {loading ? (
-        <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
-          Loading messages…
-        </div>
+        <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>Loading messages…</div>
       ) : filtered.length === 0 ? (
         <div style={{
           background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14,
@@ -224,155 +274,164 @@ export default function MessagesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map(msg => {
             const cfg = STATUS_CONFIG[msg.status]
-            const isExpanded = expandedId === msg.id
+            const isCopied = copiedId === msg.id
+            const isMarking = markingId === msg.id
             return (
-              <div key={msg.id} style={{
-                background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 14,
-                overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                transition: 'box-shadow .15s',
+              <div key={msg.id} className="msg-card" style={{
+                background: '#fff',
+                border: `1.5px solid ${msg.status === 'pending' ? '#FED7AA' : '#E5E7EB'}`,
+                borderRadius: 14,
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
               }}>
-                {/* Row */}
-                <div className="messages-row" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ padding: '16px 18px' }}>
 
-                  {/* Status dot */}
-                  <div style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    background: cfg.dot, flexShrink: 0,
-                  }} />
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <p style={{ fontWeight: 700, fontSize: 14, color: '#111', margin: 0 }}>
-                        {msg.buyer_name}
-                      </p>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, color: '#C2410C',
-                        background: '#FFF7ED', border: '1px solid #FED7AA',
-                        padding: '2px 8px', borderRadius: 10,
-                      }}>
-                        {TRIGGER_LABELS[msg.trigger] || msg.trigger}
-                      </span>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600,
-                        color: cfg.color, background: cfg.bg,
-                        padding: '2px 8px', borderRadius: 10,
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                      }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, display: 'inline-block' }} />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <p style={{
-                      fontSize: 13, color: '#6B7280', margin: '4px 0 0',
-                      whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
-                      overflow: isExpanded ? 'visible' : 'hidden',
-                      textOverflow: isExpanded ? 'unset' : 'ellipsis',
-                      lineHeight: 1.55,
+                  {/* Top row — buyer + trigger + status */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <p style={{ fontWeight: 700, fontSize: 15, color: '#111', margin: 0 }}>
+                      {msg.buyer_name}
+                    </p>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: '#C2410C',
+                      background: '#FFF7ED', border: '1px solid #FED7AA',
+                      padding: '2px 8px', borderRadius: 10,
                     }}>
-                      {msg.message}
-                    </p>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 0' }}>
+                      {TRIGGER_LABELS[msg.trigger] || msg.trigger}
+                    </span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600,
+                      color: cfg.color, background: cfg.bg,
+                      padding: '2px 8px', borderRadius: 10,
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, display: 'inline-block' }} />
+                      {cfg.label}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 'auto' }}>
                       {formatDate(msg.scheduled_at)}
-                    </p>
+                    </span>
+                  </div>
+
+                  {/* Message preview box */}
+                  <div style={{
+                    background: '#FAFAFA', border: '1px solid #F3F4F6',
+                    borderRadius: 10, padding: '12px 14px', marginBottom: 12,
+                    fontSize: 13, color: '#374151', lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {msg.message}
                   </div>
 
                   {/* Actions */}
-                  <div className="messages-actions" style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-                    {/* Expand/collapse */}
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : msg.id)}
-                      title={isExpanded ? 'Collapse' : 'Expand message'}
-                      style={{
-                        padding: '6px 8px', borderRadius: 8, border: '1.5px solid #E5E7EB',
-                        background: isExpanded ? '#F3F4F6' : '#fff', cursor: 'pointer',
-                        color: '#6B7280', transition: 'all .15s',
-                      }}
-                    >
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        {isExpanded
-                          ? <polyline points="18 15 12 9 6 15"/>
-                          : <polyline points="6 9 12 15 18 9"/>
-                        }
-                      </svg>
-                    </button>
+                  <div className="msg-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
 
-                    {/* Copy */}
-                    <button
-                      onClick={() => copyMessage(msg.message)}
-                      title="Copy message"
-                      style={{
-                        padding: '6px 8px', borderRadius: 8, border: '1.5px solid #E5E7EB',
-                        background: '#fff', cursor: 'pointer', color: '#6B7280',
-                      }}
-                    >
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                      </svg>
-                    </button>
-
-                    {/* Mark sent (only if pending) */}
+                    {/* PRIMARY: Copy & Mark Sent (only pending) */}
                     {msg.status === 'pending' && (
                       <button
-                        onClick={() => markAsSent(msg.id)}
-                        disabled={markingId === msg.id}
-                        style={{
-                          padding: '6px 12px', borderRadius: 8, border: 'none',
-                          background: markingId === msg.id ? '#F3F4F6' : '#EE4D2D',
-                          color: markingId === msg.id ? '#9CA3AF' : '#fff',
-                          fontSize: 12, fontWeight: 600,
-                          cursor: markingId === msg.id ? 'not-allowed' : 'pointer',
-                          whiteSpace: 'nowrap',
-                        }}
+                        className={`copy-sent-btn${isCopied ? ' copied' : ''}`}
+                        onClick={() => copyAndMarkSent(msg)}
+                        disabled={isMarking}
                       >
-                        {markingId === msg.id ? '…' : '✓ Sent'}
+                        {isCopied ? (
+                          <>
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            {isMarking ? 'Saving…' : '📋 Copy & Mark Sent'}
+                          </>
+                        )}
                       </button>
                     )}
 
-                    {/* Mark failed (only if pending) */}
-                    {msg.status === 'pending' && (
+                    {/* SECONDARY: Copy only (for sent/failed) */}
+                    {msg.status !== 'pending' && (
+                      <button className="copy-only-btn" onClick={() => copyMessage(msg)}>
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        {isCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    )}
+
+                    {/* Open Shopee chat */}
+                    <a
+                      href="https://seller.shopee.ph/chat"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '9px 14px', borderRadius: 9,
+                        border: '1.5px solid #E5E7EB', background: '#fff',
+                        color: '#374151', fontSize: 13, fontWeight: 600,
+                        textDecoration: 'none', transition: 'all .15s',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = '#EE4D2D'
+                        ;(e.currentTarget as HTMLAnchorElement).style.color = '#EE4D2D'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = '#E5E7EB'
+                        ;(e.currentTarget as HTMLAnchorElement).style.color = '#374151'
+                      }}
+                    >
+                      🛍️ Open Shopee
+                    </a>
+
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                      {/* Mark as sent manually (if pending) */}
+                      {msg.status === 'pending' && (
+                        <button
+                          className="icon-btn"
+                          onClick={() => markAsSent(msg.id)}
+                          disabled={isMarking}
+                          title="Mark as sent without copying"
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Mark as failed (if pending) */}
+                      {msg.status === 'pending' && (
+                        <button
+                          className="icon-btn"
+                          onClick={() => markAsFailed(msg.id)}
+                          disabled={isMarking}
+                          title="Mark as failed"
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Delete */}
                       <button
-                        onClick={() => markAsFailed(msg.id)}
-                        disabled={markingId === msg.id}
-                        title="Mark as failed"
-                        style={{
-                          padding: '6px 8px', borderRadius: 8,
-                          border: '1.5px solid #E5E7EB',
-                          background: '#fff', cursor: 'pointer',
-                          color: '#D1D5DB', transition: 'color .15s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#D1D5DB')}
+                        className="icon-btn"
+                        onClick={() => handleDelete(msg.id)}
+                        title="Delete"
                       >
                         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="15" y1="9" x2="9" y2="15"/>
-                          <line x1="9" y1="9" x2="15" y2="15"/>
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                         </svg>
                       </button>
-                    )}
-
-                    {/* Delete */}
-                    <button
-                      onClick={() => handleDelete(msg.id)}
-                      title="Delete"
-                      style={{
-                        padding: '6px 8px', borderRadius: 8,
-                        border: '1.5px solid #E5E7EB',
-                        background: '#fff', cursor: 'pointer',
-                        color: '#D1D5DB', transition: 'color .15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#D1D5DB')}
-                    >
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                        <path d="M10 11v6M14 11v6"/>
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                      </svg>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -381,7 +440,6 @@ export default function MessagesPage() {
         </div>
       )}
 
-      {/* ── Footer count ── */}
       {!loading && filtered.length > 0 && (
         <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 12, textAlign: 'right' }}>
           Showing {filtered.length} of {messages.length} message{messages.length !== 1 ? 's' : ''}
@@ -411,8 +469,6 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
     </div>
   )
 }
-
-// ─── Styles / utils ───────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 13px', borderRadius: 9,
