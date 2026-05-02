@@ -249,8 +249,13 @@ export default function OrdersPage() {
       const XLSX = await import('xlsx')
       const data = new Uint8Array(ev.target?.result as ArrayBuffer)
       const workbook = XLSX.read(data, { type: 'array', cellDates: true })
+      console.log('=== SHEET NAMES ===', workbook.SheetNames)
+      console.log('=== SHEET COUNT ===', workbook.SheetNames.length)
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      console.log('=== SHEET REF ===', sheet['!ref'])
       const text = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' })
+      console.log('=== RAW TEXT LENGTH ===', text.length)
+      console.log('=== RAW TEXT FIRST 500 ===', text.substring(0, 500))
       processParsed(text)
     }
     reader.readAsArrayBuffer(file)
