@@ -27,7 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   .select('*', { count: 'exact', head: true })
   .eq('status', 'pending')
   .eq('user_id', uid),
-        supabase.from('subscriptions').select('plan').eq('user_id', uid).single(),
+        supabase.from('subscriptions').select('plan').eq('user_id', uid).maybeSingle(),
         supabase.from('rules').select('*', { count: 'exact', head: true }).eq('user_id', uid).eq('is_active', true),
         supabase.from('templates').select('*', { count: 'exact', head: true }).eq('user_id', uid),
         supabase.from('orders').select('*', { count: 'exact', head: true }).eq('user_id', uid),
