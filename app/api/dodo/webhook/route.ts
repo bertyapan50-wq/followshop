@@ -115,6 +115,26 @@ export async function POST(req: NextRequest) {
       console.log(`Subscription updated ✓ user=${userId}`)
     }
 
+    const cancelEvents = [
+      'subscription.cancelled',
+      'subscription.expired',
+      'subscription.paused',
+    ]
+
+    if (cancelEvents.includes(eventType)) {
+      await supabaseAdmin
+        .from('subscriptions')
+        .upsert(
+          {
+            user_id:    userId,
+            plan:       'free',
+            status:     mapStatus(data.status),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' }
+        )
+    }
+
     return NextResponse.json({ received: true })
 
   } catch (err: unknown) {
