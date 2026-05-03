@@ -320,15 +320,15 @@ export default function LoginPage() {
               </p>
             </div>
             <div className="auth-stats">
-              <div className="auth-stat">
-                <div className="auth-stat-label">Messages sent</div>
-                <div className="auth-stat-value">2,847</div>
-              </div>
-              <div className="auth-stat">
-                <div className="auth-stat-label">Active sellers</div>
-                <div className="auth-stat-value">143</div>
-              </div>
-            </div>
+  <div className="auth-stat">
+    <div className="auth-stat-label">Status</div>
+    <div className="auth-stat-value" style={{fontSize:16}}>🚀 Early Access</div>
+  </div>
+  <div className="auth-stat">
+    <div className="auth-stat-label">Trial</div>
+    <div className="auth-stat-value" style={{fontSize:16}}>7 days free</div>
+  </div>
+</div>
           </div>
 
           {/* ── Right Panel ── */}

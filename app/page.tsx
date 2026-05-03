@@ -488,56 +488,18 @@ export default function Home() {
           </div>
         </div>
       </section>
-{/* TESTIMONIALS */}
+{/* EARLY ACCESS */}
 <section className="alt-bg">
-  <div className="container">
-    <div className="section-tag">💬 What Sellers Say</div>
-    <h2>Trusted by Shopee<br/>sellers across PH</h2>
-    <div className="cards-3" style={{marginTop:40}}>
-      {[
-        {
-          name: 'Maria Santos',
-          shop: 'MariaPH Shop · Cebu',
-          avatar: '👩',
-          stars: 5,
-          text: 'Dati 1-2 oras ako sa pag-copy paste ng messages. Ngayon 5 minutes lang. Yung repeat buyers ko tumaas ng 30% after using FollowShop!',
-        },
-        {
-          name: 'Carlo Reyes',
-          shop: 'TechGadgetsPH · Manila',
-          avatar: '👨',
-          stars: 5,
-          text: 'Yung AI generator is a game changer. Hindi na ko nag-iisip ng messages — generates na siya ng magandang Taglish messages para sa buyers ko.',
-        },
-        {
-          name: 'Ana Villanueva',
-          shop: 'AnaFashion · Davao',
-          avatar: '👩',
-          stars: 5,
-          text: 'Ang daming reviews na natanggap ko after using FollowShop. Dati 3-4 reviews per week, ngayon 15-20 na. Malaking tulong sa ranking ko sa Shopee!',
-        },
-      ].map((t, i) => (
-        <div className="card" key={i} style={{position:'relative'}}>
-          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:16}}>
-            <div style={{
-              width:44,height:44,borderRadius:12,
-              background:'var(--orange-dim)',border:'1px solid var(--orange-border)',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,
-            }}>{t.avatar}</div>
-            <div>
-              <div style={{fontWeight:700,fontSize:14,color:'var(--text)'}}>{t.name}</div>
-              <div style={{fontSize:12,color:'var(--muted)',marginTop:1}}>{t.shop}</div>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:2,marginBottom:12}}>
-            {Array.from({length:t.stars}).map((_,j)=>(
-              <span key={j} style={{color:'#F59E0B',fontSize:14}}>★</span>
-            ))}
-          </div>
-          <p style={{fontSize:14,color:'var(--sub)',lineHeight:1.7,margin:0}}>"{t.text}"</p>
-        </div>
-      ))}
-    </div>
+  <div className="container" style={{textAlign:'center'}}>
+    <div className="section-tag" style={{justifyContent:'center'}}>🚀 Early Access</div>
+    <h2>Be one of the first<br/>Shopee sellers to try it</h2>
+    <p className="section-sub" style={{margin:'14px auto 0'}}>
+      Just launched — looking for beta users. Try it free and help shape the product.
+    </p>
+    <a href="/signup" className="btn-primary" style={{margin:'32px auto 0',display:'inline-flex'}}>
+      Join Beta — It's Free
+      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
   </div>
 </section>
 
@@ -598,7 +560,7 @@ export default function Home() {
           <a href="/pricing">Pricing</a>
           <a href="mailto:support@followshop.app">Contact</a>
         </div>
-        <span className="footer-copy">© 2025 FollowShop. Made with ❤️ for SEA sellers.</span>
+        <span className="footer-copy">© 2026 FollowShop. Made with ❤️ for SEA sellers.</span>
       </footer>
     </>
   )
